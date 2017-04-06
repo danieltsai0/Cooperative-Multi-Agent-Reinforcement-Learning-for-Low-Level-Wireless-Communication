@@ -5,6 +5,7 @@ import IPython as ipy
 import itertools
 import matplotlib.pyplot as plt
 
+# normalized constant initializer from cs 294-112 code
 def normc_initializer(std=1.0):
     def _initializer(shape, dtype=None, partition_info=None):
         out = np.random.randn(*shape).astype(np.float32)
@@ -13,94 +14,154 @@ def normc_initializer(std=1.0):
     return _initializer
 
 class NeuralTransmitter(object):
-    def __init__(self, n_bits=4, n_hidden=4):
+    def __init__(self, n_bits=4, n_hidden=4, steps_per_episode=32, stepsize=1e-2):
         self.n_bits = n_bits
         self.n_hidden = n_hidden
+        self.steps_per_episode = steps_per_episode
+        self.stepsize = stepsize
+
+        self.step = 0 # current step
+
+        # saved xs, actions and advantages
+        self.reset_accum()
 
         # Network Structure
-        # ith entry=0 --> x_[2*i] = 1
-        # ith entry=1 --> x_[2*i+1] = 1
-        # e.g. x = [0 1] -> [1 0 0 1]
-        self.x_ = tf.placeholder(tf.float32, [None, self.n_bits*2])
+        self.sy_x = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
+        self.sy_r = tf.placeholder(tf.float32, [None]) # radius in polar coordinates
+        self.sy_theta = tf.placeholder(tf.float32, [None]) # angle in radians
+        self.sy_adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
 
         # Hidden Layer
         self.h1 = tf.contrib.layers.fully_connected(
-            inputs = self.x_,
+            inputs = self.sy_x,
             num_outputs = self.n_hidden,
             activation_fn = tf.nn.relu, # relu activation for hidden layer
             weights_initializer = normc_initializer(1.0),
             biases_initializer = tf.constant_initializer(.1)
         )
 
-        # Outputs: polar form mean, polar form logstd
-        self.theta_unscaled = tf.contrib.layers.fully_connected(
-            inputs = self.h1,
-            num_outputs = 1,
-            activation_fn = tf.nn.tanh, # tanh for -1 to 1
-            weights_initializer = normc_initializer(1.0),
-            biases_initializer = tf.constant_initializer(-.1*self.n_hidden)
-        )
-        self.r_unscaled = tf.contrib.layers.fully_connected(
-            inputs = self.h1,
-            num_outputs = 1,
-            activation_fn = tf.nn.sigmoid, # sigmoid for 0 to 1
-            weights_initializer = normc_initializer(1.0),
-            biases_initializer = tf.constant_initializer(-.1*self.n_hidden)
-        )
-        self.theta = self.theta_unscaled * np.pi
-        self.r = self.r_unscaled * tf.Variable(0.5, name='r_scale')
-        self.theta_logstd = tf.Variable(-3.)
-        self.r_logstd = tf.Variable(-8.)
+        # Outputs
+        self.theta = np.pi * tf.contrib.layers.fully_connected(
+                inputs = self.h1,
+                num_outputs = 1,
+                activation_fn = tf.nn.tanh, # tanh for -1 to 1
+                weights_initializer = normc_initializer(1.0),
+                biases_initializer = tf.constant_initializer(0.)
+            )
+        self.r_scale = 2*tf.Variable(.707, name='r_scale')
+        self.r = self.r_scale * tf.contrib.layers.fully_connected (
+                inputs = self.h1,
+                num_outputs = 1,
+                activation_fn = tf.nn.sigmoid, # sigmoid for 0 to 1
+                weights_initializer = normc_initializer(1.0),
+                biases_initializer = tf.constant_initializer(0.)
+            )
+        self.r_logstd = tf.Variable(-2.)
+        self.theta_logstd = tf.Variable(0.7)
 
-        self.theta_distr = tf.contrib.distributions.Normal(self.theta, tf.exp(self.theta_logstd))
+        # randomized actions
         self.r_distr = tf.contrib.distributions.Normal(self.r, tf.exp(self.r_logstd))
+        self.theta_distr = tf.contrib.distributions.Normal(self.theta, tf.exp(self.theta_logstd))
 
-        self.theta_sample = self.theta_distr.sample()
-        self.r_sample = self.r_distr.sample()
+        self.sy_r_sample = self.r_distr.sample()
+        self.sy_theta_sample = self.theta_distr.sample()
+
+        # for forming surrogate loss
+        self.r_logprob = self.r_distr.log_prob(self.sy_r)
+        self.theta_logprob = self.theta_distr.log_prob(self.sy_theta)
+
+        self.sy_surr = - tf.reduce_mean(self.sy_adv * self.theta_logprob * self.r_logprob)
+        self.sy_stepsize = tf.placeholder(shape=[], dtype=tf.float32)
+        self.update_op = tf.train.AdamOptimizer(self.sy_stepsize).minimize(self.sy_surr)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-    def transmit(self, x):
-        # convert input into proper format (e.g. x=[1 0] --> [0 1 1 0])
-        x_converted = np.empty((0, self.n_bits*2))
-        for i in range(x.shape[0]):
-            x_new = np.zeros(self.n_bits*2)
-            for j in range(self.n_bits):
-                x_new[2*j] = 0. if x[i, j] else 1.
-                x_new[2*j+1] = 1. if x[i, j] else 0.
-            x_converted = np.r_[x_converted, x_new[None]]
+    def reset_accum(self):
+        self.xs_accum = np.empty((0, self.n_bits))
+        self.r_accum = np.empty(0)
+        self.theta_accum = np.empty(0)
+        self.adv_accum = np.empty(0)
 
-        # run network
-        theta, r = self.sess.run([self.theta_sample, self.r_sample], feed_dict={
-                self.x_: x_converted
+    def policy_update(self):
+        print ("updating policy")
+        r_scale, theta_logstd, r_logstd = self.sess.run([self.r_scale, self.theta_logstd, self.r_logstd])
+
+        sy_surr_bef = self.sess.run([self.sy_surr], feed_dict={
+                self.sy_x: self.xs_accum,
+                self.sy_r: self.r_accum,
+                self.sy_theta: self.theta_accum,
+                self.sy_adv: self.adv_accum,
+                self.sy_stepsize: self.stepsize
             })
 
-        return theta, r
+        print ("sy_surr_bef:", sy_surr_bef)
+        print ("r_scale:", r_scale)
+        print ("theta_std:", np.exp(theta_logstd))
+        print ("r_std:", np.exp(r_logstd))
+
+        self.sess.run([self.update_op], feed_dict={
+                self.sy_x: self.xs_accum,
+                self.sy_r: self.r_accum,
+                self.sy_theta: self.theta_accum,
+                self.sy_adv: self.adv_accum,
+                self.sy_stepsize: self.stepsize
+            })
+
+        sy_surr_aft = self.sess.run([self.sy_surr], feed_dict={
+                self.sy_x: self.xs_accum,
+                self.sy_r: self.r_accum,
+                self.sy_theta: self.theta_accum,
+                self.sy_adv: self.adv_accum,
+                self.sy_stepsize: self.stepsize
+            })
+
+        print ("sy_surr_aft:", sy_surr_aft)
+
+        self.reset_accum()
+
+    def transmit(self, x):
+        self.step += 1
+
+        # convert input into proper format (e.g. x=[1 0] --> [1 -1])
+        x = 2 * (x - .5)
+
+        # run policy
+        theta, r = self.sess.run([self.sy_theta_sample, self.sy_r_sample], feed_dict={
+                self.sy_x: x
+            })
+
+        self.xs_accum = np.r_[self.xs_accum, x]
+        self.r_accum = np.r_[self.r_accum, r[0]]
+        self.theta_accum = np.r_[self.theta_accum, theta[0]]
+
+        theta, r = theta[0][0], r[0][0]
+        return r * np.array([np.cos(theta), np.sin(theta)])
+
+    def receive_reward(self, rew):
+        self.adv_accum = np.r_[self.adv_accum, rew + .1]
+
+        # If episode over, update policy and reset
+        if self.step >= self.steps_per_episode:
+            self.policy_update()
+            self.step = 0
 
     def constellation(self):
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
         """
-        bitstrings = np.array(20*list(itertools.product([0, 1], repeat=self.n_bits)))
-        thetas, rs = self.transmit(bitstrings)
+        bitstrings = list(itertools.product([0, 1], repeat=self.n_bits))
 
         plt.figure()
-        for bits, theta, r in zip(bitstrings, thetas, rs):
-            plt.scatter(r*np.cos(theta), r*np.sin(theta), label=str(bits))
+        for bs in bitstrings:
+            theta, r = self.transmit(np.array(bs)[None])
+            plt.scatter(r*np.cos(theta), r*np.sin(theta), label=str(bs))
 
         plt.legend()
         plt.show()
 
-
 if __name__ == '__main__':
-    nt = NeuralTransmitter(n_bits=2)
-    # x = np.array([[0, 1],[1,1]])
-    # print (nt.transmit(x))
-    nt.constellation()
-
-if 0 and __name__ == '__main__':
-    env = Environment(n_bits=2)
+    env = Environment(n_bits=2, l=.001)
 
     psk = {
         (0, 0): 1.0/np.sqrt(2)*np.array([1,-1]),
@@ -109,29 +170,34 @@ if 0 and __name__ == '__main__':
         (1, 1): 1.0/np.sqrt(2)*np.array([1,1])
     }
 
-    # tx
-    tx_inp = env.get_input_transmitter()
-    tx_out = psk.get(tuple(tx_inp))
-    env.output_transmitter(tx_out)
+    steps_per_episode = 1000
 
-    print ("tx_input:", tx_inp)
-    print ("tx_out:", tx_out)
+    nt = NeuralTransmitter(n_bits=2, steps_per_episode=steps_per_episode)
 
-    # rx
-    rx_inp = env.get_input_receiver()
-    rx_out, dist = None, float("inf")
-    for k in psk.keys():
-        d = np.linalg.norm(rx_inp - psk[k], ord=2)
-        if d < dist:
-            rx_out = np.array(k)
-            dist = d
-    env.output_receiver(rx_out)
+    for i in range(1000):
+        rew_per_ep = 0.0
+        for _ in range(steps_per_episode):
+            # tx
+            tx_inp = env.get_input_transmitter()
+            tx_out = nt.transmit(tx_inp[None])
+            env.output_transmitter(tx_out)
 
-    print ("rx_input:", rx_inp)
-    print ("rx_out:", rx_out)
+            # rx
+            rx_inp = env.get_input_receiver()
+            rx_out, dist = None, float("inf")
+            for k in psk.keys():
+                d = np.linalg.norm(rx_inp - psk[k], ord=2)
+                if d < dist:
+                    rx_out = np.array(k)
+                    dist = d
+            env.output_receiver(rx_out)
 
-    # rewards
-    tx_reward = env.reward_transmitter()
-    rx_reward = env.reward_receiver()
+            # rewards
+            tx_reward = env.reward_transmitter()
+            rx_reward = env.reward_receiver()
 
-    print ("reward:", tx_reward)
+            nt.receive_reward(tx_reward)
+
+            rew_per_ep += tx_reward * 1.0/steps_per_episode
+        print ("rew_per_ep:", rew_per_ep)
+    nt.constellation()
