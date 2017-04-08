@@ -21,6 +21,6 @@ tasks:
 2. fix Rx, learn Tx - Shane
 ⋅⋅⋅network arch, noise, episode length, lambda, 
 ⋅⋅⋅tweak channel impairments
-4. varaible length case - Albert
+4. ~~varaible length case~~ Equaliser Rx - Albert
 5. info theory / one page writeup - Colin
 	
