@@ -1,10 +1,19 @@
+############################################################
+#
+#  Basic Modulation Environment Simulator
+#  Shane Barratt <stbarratt@gmail.com>
+#
+#  Simulates a communication environment.
+#
+############################################################
+
 import tensorflow as tf
 import numpy as np
 
 class Environment(object):
 
     def __init__(self, n_bits = 4, l = .01,
-                    noise=lambda x: x + np.random.normal(loc=0.0, scale=.1, size=2)):
+                    noise=lambda x: x + np.random.normal(loc=0.0, scale=.3, size=2)):
         self.n_bits = n_bits
         self.state = 0
         self.l = l
