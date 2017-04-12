@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print ("tx_out:", tx_out)
 
     # rx
-    rx_inp = env.get_input_receiver()
+    rx_inp = env.get_input_receiver() 
     rx_out, dist = None, float("inf")
     for k in psk.keys():
         d = np.linalg.norm(rx_inp - psk[k], ord=2)

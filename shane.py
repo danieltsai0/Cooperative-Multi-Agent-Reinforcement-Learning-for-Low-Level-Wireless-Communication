@@ -1,3 +1,13 @@
+############################################################
+#
+#  Basic Learning Receiver
+#  Shane Barratt
+#
+#  Simulates a learning transmitter with a fixed receiver.
+#
+############################################################ 
+
+
 from environment import Environment
 import tensorflow as tf
 import numpy as np
