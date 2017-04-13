@@ -25,5 +25,5 @@ tasks:
 5. info theory / one page writeup - Colin
 	
 ## CS294-121: 
-[https://www.sharelatex.com/project/58eedf885eecccdc7a8817a8]{https://www.sharelatex.com/project/58eedf885eecccdc7a8817a8}
+[https://www.sharelatex.com/project/58eedf885eecccdc7a8817a8](https://www.sharelatex.com/project/58eedf885eecccdc7a8817a8)
 ## CS294-133:
