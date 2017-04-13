@@ -43,7 +43,7 @@ class Environment(object):
         if self.state != 2:
             raise Exception('Wrong order')
 
-        assert output.shape[0] == 2, "Wrong length"
+        assert output.shape[0] == self.n_bits, "Wrong length"
 
         self.rx_output = output
         self.state = 3

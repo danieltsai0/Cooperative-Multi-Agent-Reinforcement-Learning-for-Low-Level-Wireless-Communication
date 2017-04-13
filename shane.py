@@ -145,42 +145,72 @@ class NeuralTransmitter(object):
             self.policy_update()
             self.step = 0
 
-    def constellation(self):
+    def constellation(self, iteration=0, groundtruth=None):
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
         """
         bitstrings = list(itertools.product([0, 1], repeat=self.n_bits))
 
-        plt.figure()
+        plt.figure(figsize=(4, 4))
         for bs in bitstrings:
             x,y = self.transmit(np.array(bs)[None], evaluate=True)
             plt.scatter(x, y, label=str(bs))
+            plt.annotate(str(bs), (x, y), size=5)
+        plt.axvline(0)
+        plt.axhline(0)
+        plt.xlim([-1.5, 1.5])
+        plt.ylim([-1.5, 1.5])
 
-        plt.legend()
-        plt.show()
+        if groundtruth:
+            for k in groundtruth.keys():
+                x_gt, y_gt = groundtruth[k]
+                plt.scatter(x_gt, y_gt, label=str(bs), s=5, color='purple')
+                plt.annotate(str(k), (x_gt, y_gt), size=5)
+
+        plt.savefig('figures/%d.png' % iteration)
 
 if __name__ == '__main__':
     # set random seeds
     tf.set_random_seed(0)
     np.random.seed(0)
 
-    n_bits = 2
+    n_bits = 4
     l = .01
     steps_per_episode = 512
 
     env = Environment(n_bits=n_bits, l=l)
 
+    # page 570 of (Proakis, Salehi)
     psk = {
-        (0, 0): 1.0/np.sqrt(2)*np.array([1,-1]),
-        (0, 1): 1.0/np.sqrt(2)*np.array([-1,-1]),
-        (1, 0): 1.0/np.sqrt(2)*np.array([-1,1]),
-        (1, 1): 1.0/np.sqrt(2)*np.array([1,1])
+        (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
+        (0, 1): 1.0/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
+        (1, 1): 1.0/np.sqrt(2)*np.array([-1,-1])
     }
 
-    def rx_decode(rx_inp):
+    qam16 = {
+        (0, 0, 0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
+        (0, 0, 0, 1): 1.0/np.sqrt(2)*np.array([2, 1]),
+        (0, 0, 1, 0): 1.0/np.sqrt(2)*np.array([1, 2]),
+        (0, 0, 1, 1): 1.0/np.sqrt(2)*np.array([2, 2]),
+        (0, 1, 0, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
+        (0, 1, 0, 1): 1.0/np.sqrt(2)*np.array([1, -2]),
+        (0, 1, 1, 0): 1.0/np.sqrt(2)*np.array([2, -1]),
+        (0, 1, 1, 1): 1.0/np.sqrt(2)*np.array([2, -2]),
+        (1, 0, 0, 0): 1.0/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0, 0, 1): 1.0/np.sqrt(2)*np.array([-1, 2]),
+        (1, 0, 1, 0): 1.0/np.sqrt(2)*np.array([-2, 1]),
+        (1, 0, 1, 1): 1.0/np.sqrt(2)*np.array([-2, 2]),
+        (1, 1, 0, 0): 1.0/np.sqrt(2)*np.array([-1, -1]),
+        (1, 1, 0, 1): 1.0/np.sqrt(2)*np.array([-2, -1]),
+        (1, 1, 1, 0): 1.0/np.sqrt(2)*np.array([-1, -2]),
+        (1, 1, 1, 1): 1.0/np.sqrt(2)*np.array([-2, -2])
+    }
+
+    def rx_decode(rx_inp, m=psk):
         rx_out, dist = None, float("inf")
-        for k in psk.keys():
-            d = np.linalg.norm(rx_inp - psk[k], ord=2)
+        for k in m.keys():
+            d = np.linalg.norm(rx_inp - m[k], ord=2)
             if d < dist:
                 rx_out = np.array(k)
                 dist = d
@@ -199,7 +229,7 @@ if __name__ == '__main__':
 
             # rx
             rx_inp = env.get_input_receiver()
-            rx_out = rx_decode(rx_inp)
+            rx_out = rx_decode(rx_inp, qam16)
             env.output_receiver(rx_out)
 
             # rewards
@@ -220,12 +250,10 @@ if __name__ == '__main__':
             rx_out = rx_decode(rx_inp)
             rew += np.linalg.norm(np.array(b) - rx_out, ord=1)
 
-        print ("######## Epoch %d ########" % i)
+        print ("\n######## Epoch %d ########" % i)
         print ("rew_per_ep:", rew_per_ep)
         print ("bits incorrect / %d:" % (n_bits*2**(n_bits)), rew)
         print ("wall clock time: %.4f ms" % ((end - start)*1000))
 
-        if rew_per_ep > -.25:
-            nt.constellation()
-            
-
+        if i % 10 == 0:
+            nt.constellation(iteration=i, groundtruth=psk)
