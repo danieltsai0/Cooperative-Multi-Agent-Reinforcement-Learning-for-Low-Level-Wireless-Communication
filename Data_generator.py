@@ -33,7 +33,8 @@ class Data_generator(object):
                             1+3j, 1+1j, 1-3j, 1-1j]/(3*sq2)))
         }
 
-    def __init__(self):
+    def __init__(self, seed=0):
+        np.random.seed(seed)
         pass
 
 
@@ -55,19 +56,6 @@ class Data_generator(object):
             raise
             return -1
 
-    def modulate(self):
-        """ maps a batch of bits to a given constellation (function stub)
-            INPUT:
-                symbols: np.array of symbols to be modulated
-                constellation: list or np.array of complex-valued constellation points 
-            OUTPUT:
-                list of complex valued symbols    
-        """
-        pass
-    # fills in the functionality for the function stub defined above
-    modulate = np.vectorize(_modulate_symbol, excluded=['constellation'])
-    modulate.excluded.add(1)
-
 
     def get_random_data(self, num, mod):
         """ generates random modulated data
@@ -88,7 +76,7 @@ class Data_generator(object):
            
         # generate the data
         data_raw = np.random.randint(0,self.constellations[mod][0],num)
-        data_mod = self.modulate(data_raw, self.constellations[mod][1])
+        data_mod = self.constellations[mod][1][data_raw]
 
         return (data_raw, data_mod)
 
