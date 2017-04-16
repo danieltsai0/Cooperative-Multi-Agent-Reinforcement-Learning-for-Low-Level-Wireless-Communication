@@ -1,0 +1,8 @@
+for single y-axis plot example:
+$ python generic_plot.py 16qam_ber.csv --title "BER 16QAM"
+
+for douvle y-axis plot example:
+$ python generic_plot.py 16qam_ber.csv 16qam_num.csv --title "BER/Clusters 16QAM"
+
+
+check both CSV files for format.
