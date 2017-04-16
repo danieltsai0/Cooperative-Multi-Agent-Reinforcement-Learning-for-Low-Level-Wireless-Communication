@@ -57,9 +57,9 @@ def fancy_slice_2d(X, inds0, inds1):
 ######################
 
 psk = {
-        (0, 0): 1.0/np.sqrt(2)*np.array([1,-1]),
-        (0, 1): 1.0/np.sqrt(2)*np.array([-1,-1]),
-        (1, 0): 1.0/np.sqrt(2)*np.array([-1,1]),
+        (-1, -1): 1.0/np.sqrt(2)*np.array([1,-1]),
+        (-1, 1): 1.0/np.sqrt(2)*np.array([-1,-1]),
+        (1, -1): 1.0/np.sqrt(2)*np.array([-1,1]),
         (1, 1): 1.0/np.sqrt(2)*np.array([1,1])
     }
 

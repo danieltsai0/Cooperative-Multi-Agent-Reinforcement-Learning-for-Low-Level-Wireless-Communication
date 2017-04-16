@@ -48,7 +48,7 @@ class NeuralReceiver:
         # adv: reward for each action taken
         #     shape: (?,)
 
-    def __init__(self, n_bits=2, n_input=1, steps_per_episode=32, stepsize=1e-2):
+    def __init__(self, n_bits=2, n_input=1):
 
         # Static network vars
         n_h1 = 8*n_input
@@ -61,6 +61,7 @@ class NeuralReceiver:
         self.input = tf.placeholder(shape=[None,2*n_input], name="input", dtype=tf.float32) # NOTE: second dimension is twice of 'k' 
         self.actions = tf.placeholder(shape=[None], name="output", dtype=tf.int32)
         self.adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
+        self.stepsize = tf.placeholder(shape=[], dtype=tf.float32)
 
         # Layers
         h1 = tf.contrib.layers.fully_connected(
@@ -95,7 +96,7 @@ class NeuralReceiver:
 
         # Define loss and optimizer
         self.surr = - tf.reduce_mean(self.adv * self.selected_logprobs)
-        self.update_op = tf.train.AdamOptimizer(stepsize).minimize(self.surr)
+        self.update_op = tf.train.AdamOptimizer(self.stepsize).minimize(self.surr)
 
         # Initialize session
         self.sess = tf.Session()
@@ -172,14 +173,15 @@ if __name__ == '__main__':
     steps_per_episode = 1000
     train_iter = 1000
     fn_base = "images/decision_iter_"
+    stepsize = 1e-2
 
     # define environment and neural Rx
-    env = Environment(n_bits=2, l=.001)
-    nr = NeuralReceiver(n_bits=2, n_input=1, steps_per_episode=steps_per_episode)
+    env = Environment(n_bits=2, l=.001, noise=lambda x: x + np.random.normal(loc=0.0, scale=2, size=2))
+    nr = NeuralReceiver(n_bits=2, n_input=1)
 
     # Train Receiver
     for i in range(train_iter):
-        rew_per_ep = 0.0
+
         obs, acs, rewards = [], [], []
         for _ in range(steps_per_episode):
             # tx
@@ -204,14 +206,18 @@ if __name__ == '__main__':
         acs = np.array(acs)
         rewards = np.array(rewards)
 
-        _ = nr.sess.run(nr.update_op, feed_dict={nr.input:obs, nr.actions:acs, nr.adv:rewards})
+        if i > 300:
+            stepsize = 1e-3
+        if i > 600:
+            stepsize = 1e-4
+
+        _ = nr.sess.run(nr.update_op, feed_dict={nr.input:obs, nr.actions:acs, nr.adv:rewards, nr.stepsize:stepsize})
         if i % 50 == 0:
             print("iteration number",i)
             print("avg reward for this episode:",np.average(rewards))
-            # fn = fn_base+str(i)+".png"
-            # nr.draw_boundaries("",fn)
+            fn = fn_base+str(i)+".png"
+            nr.draw_boundaries("",fn)
 
-    print("drawing boundaries")
     title = "Decision Boundaries over Complex Plane for Fixed Tx and \nLearning Rx, fixed and known number of transmitted bits."
     fn = fn_base+str(i)+".png"
     nr.draw_boundaries(title,fn)
