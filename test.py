@@ -1,26 +1,28 @@
-class Test:
-	def __init__(self, state):
-		self.one = "rh3"
-		self.two = "2444"
-		self.func = None
+import numpy as np
+def int_to_coord(x, n_bits):
+    bin_rep = [int(y) for y in "{0:b}".format(x)]
+    pad = n_bits - len(bin_rep)
 
-		if state:
-			self.func = self.func1
-		else:
-			self.func = self.func2
-
-	def do_stuff(self, arg):
-		print(self.func(arg))
-
-	def func1(self, phrase):
-		return self.one+phrase
-
-	def func2(self, phrase):
-		return self.two+phrase
+    return tuple(np.pad(bin_rep, pad_width=(pad,0), mode='constant', constant_values=0))
 
 
-t1 = Test(0)
-t2 = Test(1)
+qam16 = {
+        (0, 0, 0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
+        (0, 0, 0, 1): 1.0/np.sqrt(2)*np.array([2, 1]),
+        (0, 0, 1, 0): 1.0/np.sqrt(2)*np.array([1, 2]),
+        (0, 0, 1, 1): 1.0/np.sqrt(2)*np.array([2, 2]),
+        (0, 1, 0, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
+        (0, 1, 0, 1): 1.0/np.sqrt(2)*np.array([1, -2]),
+        (0, 1, 1, 0): 1.0/np.sqrt(2)*np.array([2, -1]),
+        (0, 1, 1, 1): 1.0/np.sqrt(2)*np.array([2, -2]),
+        (1, 0, 0, 0): 1.0/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0, 0, 1): 1.0/np.sqrt(2)*np.array([-1, 2]),
+        (1, 0, 1, 0): 1.0/np.sqrt(2)*np.array([-2, 1]),
+        (1, 0, 1, 1): 1.0/np.sqrt(2)*np.array([-2, 2]),
+        (1, 1, 0, 0): 1.0/np.sqrt(2)*np.array([-1, -1]),
+        (1, 1, 0, 1): 1.0/np.sqrt(2)*np.array([-2, -1]),
+        (1, 1, 1, 0): 1.0/np.sqrt(2)*np.array([-1, -2]),
+        (1, 1, 1, 1): 1.0/np.sqrt(2)*np.array([-2, -2])
+    }
 
-t1.do_stuff("hello")
-t2.do_stuff("hello")
+print(qam16[int_to_coord(6,4)])

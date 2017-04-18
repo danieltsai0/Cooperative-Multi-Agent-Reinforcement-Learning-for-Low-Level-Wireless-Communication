@@ -52,19 +52,40 @@ def fancy_slice_2d(X, inds0, inds1):
 #
 ############################################################ 
 
-######################
-# Functions for QPSK #
-######################
+def polar_to_cartesian(r, theta):
+    return r * np.array([np.cos(theta), np.sin(theta)])
 
 psk = {
-        (-1, -1): 1.0/np.sqrt(2)*np.array([1,-1]),
-        (-1, 1): 1.0/np.sqrt(2)*np.array([-1,-1]),
-        (1, -1): 1.0/np.sqrt(2)*np.array([-1,1]),
-        (1, 1): 1.0/np.sqrt(2)*np.array([1,1])
+        (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
+        (0, 1): 1.0/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
+        (1, 1): 1.0/np.sqrt(2)*np.array([-1,-1])
     }
 
-def qpsk_int_to_coord(x):
-    return np.array([x//2, x%2])
+qam16 = {
+        (0, 0, 0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
+        (0, 0, 0, 1): 1.0/np.sqrt(2)*np.array([2, 1]),
+        (0, 0, 1, 0): 1.0/np.sqrt(2)*np.array([1, 2]),
+        (0, 0, 1, 1): 1.0/np.sqrt(2)*np.array([2, 2]),
+        (0, 1, 0, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
+        (0, 1, 0, 1): 1.0/np.sqrt(2)*np.array([1, -2]),
+        (0, 1, 1, 0): 1.0/np.sqrt(2)*np.array([2, -1]),
+        (0, 1, 1, 1): 1.0/np.sqrt(2)*np.array([2, -2]),
+        (1, 0, 0, 0): 1.0/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0, 0, 1): 1.0/np.sqrt(2)*np.array([-1, 2]),
+        (1, 0, 1, 0): 1.0/np.sqrt(2)*np.array([-2, 1]),
+        (1, 0, 1, 1): 1.0/np.sqrt(2)*np.array([-2, 2]),
+        (1, 1, 0, 0): 1.0/np.sqrt(2)*np.array([-1, -1]),
+        (1, 1, 0, 1): 1.0/np.sqrt(2)*np.array([-2, -1]),
+        (1, 1, 1, 0): 1.0/np.sqrt(2)*np.array([-1, -2]),
+        (1, 1, 1, 1): 1.0/np.sqrt(2)*np.array([-2, -2])
+    }
 
-def qpsk_coord_to_int(x1, x2):
-    return x1 + 2*x2
+def int_to_coord(x, n_bits):
+    bin_rep = [int(y) for y in "{0:b}".format(x)]
+    pad = n_bits - len(bin_rep)
+
+    return np.pad(bin_rep, pad_width=(pad,0), mode='constant', constant_values=0)
+
+def zero_to_neg_one(x):
+    return 2 * (x - .5)

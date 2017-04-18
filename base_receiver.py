@@ -51,10 +51,10 @@ class NeuralReceiver:
     def __init__(self, n_bits=2, n_input=1):
 
         # Static network vars
-        n_h1 = 8*n_input
-        n_h2 = 2*n_h1
+        n_h1 = 16*n_input
+        n_h2 = n_h1//2
         self.num_actions = 2**n_bits
-        self.f_exploration = None
+        self.n_bits = n_bits
         self.epsilon = 0.05
 
         # Placeholders
@@ -95,14 +95,19 @@ class NeuralReceiver:
         self.selected_logprobs = fancy_slice_2d(self.logprobs, tf.range(num_samples), self.actions)
 
         # Define loss and optimizer
-        self.surr = - tf.reduce_mean(self.adv * self.selected_logprobs)
+        self.surr = -tf.reduce_mean(self.adv * self.selected_logprobs)
         self.update_op = tf.train.AdamOptimizer(self.stepsize).minimize(self.surr)
 
         # Initialize session
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(self, action, epsilon):
+    # returns output in format of (key to mod scheme map, output)
+    def output(self, rx_inp):
+        out = self.sess.run(self.sampled_act, feed_dict={self.input:rx_inp})[0]
+        return int_to_coord(out, self.n_bits), out
+
+    def epsilon_greedy(self, actions, epsilon):
         # return optimal action
         if np.random.rand() > epsilon:
           return action
@@ -113,7 +118,8 @@ class NeuralReceiver:
     def boltzmann_exploration(self, action):
         return action     
 
-    def draw_boundaries(self, title, fn):
+
+    def draw_boundaries(self, title, fn, iteration):
         # Useful maps
         color_map = {
                     0: 'deepskyblue',
@@ -150,11 +156,11 @@ class NeuralReceiver:
         for text in leg.get_texts():
             text.set_color(color_map[inv_legend_map[text.get_text()]])
 
-        plt.title(title)
+        plt.title(title % iteration)
         plt.xlabel("Real axis")
         plt.ylabel("Imaginary axis")
-        plt.savefig(fn)
-        # plt.show()
+        plt.savefig('figures/Rx/%d.png' % iteration)
+        plt.close()
 
 
 
@@ -172,11 +178,12 @@ if __name__ == '__main__':
     n_bits = 2
     steps_per_episode = 1000
     train_iter = 1000
-    fn_base = "images/decision_iter_"
+    fn_base = "images/decision_iter_%d.png"
+    title = "Decision Boundaries over Complex Plane for Fixed Tx and \nLearning Rx, fixed and known number of transmitted bits.\nIteration number %d."
     stepsize = 1e-2
 
     # define environment and neural Rx
-    env = Environment(n_bits=2, l=.001, noise=lambda x: x + np.random.normal(loc=0.0, scale=2, size=2))
+    env = Environment(n_bits=2, l=.001, noise=lambda x: x + np.random.normal(loc=0.0, scale=.3, size=2))
     nr = NeuralReceiver(n_bits=2, n_input=1)
 
     # Train Receiver
@@ -191,8 +198,8 @@ if __name__ == '__main__':
 
             # rx
             rx_inp = env.get_input_receiver()
-            rx_out = nr.sess.run(nr.sampled_act, feed_dict={nr.input:rx_inp[None]})[0]
-            env.output_receiver(qpsk_int_to_coord(rx_out)) # give env the cartesian representation of action
+            rx_out, out = nr.sess.run(nr.sampled_act, feed_dict={nr.input:rx_inp[None]})[0]
+            env.output_receiver(rx_out) # give env the cartesian representation of action
 
             # rewards
             tx_reward = env.reward_transmitter()
@@ -203,21 +210,16 @@ if __name__ == '__main__':
             rewards.append(rx_reward)
 
         obs = np.array(obs)
-        acs = np.array(acs)
+        acs = np.array(out)
         rewards = np.array(rewards)
 
         if i > 300:
-            stepsize = 1e-3
-        if i > 600:
-            stepsize = 1e-4
+            stepsize = 5e-3
 
         _ = nr.sess.run(nr.update_op, feed_dict={nr.input:obs, nr.actions:acs, nr.adv:rewards, nr.stepsize:stepsize})
-        if i % 50 == 0:
+        if i % 10 == 0:
             print("iteration number",i)
             print("avg reward for this episode:",np.average(rewards))
-            fn = fn_base+str(i)+".png"
-            nr.draw_boundaries("",fn)
+            nr.draw_boundaries(title, fn_base, i)
 
-    title = "Decision Boundaries over Complex Plane for Fixed Tx and \nLearning Rx, fixed and known number of transmitted bits."
-    fn = fn_base+str(i)+".png"
-    nr.draw_boundaries(title,fn)
+    nr.draw_boundaries(title, fn_base, i)

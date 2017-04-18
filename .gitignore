@@ -100,3 +100,5 @@ ENV/
 # Other files
 test*
 images/
+figures/
+temp*

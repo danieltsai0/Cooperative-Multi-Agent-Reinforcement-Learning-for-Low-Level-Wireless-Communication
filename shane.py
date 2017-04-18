@@ -247,7 +247,7 @@ if __name__ == '__main__':
         for b in bitstrings:
             tx_out = nt.transmit(np.array(b)[None], evaluate=True)
             rx_inp = tx_out
-            rx_out = rx_decode(rx_inp)
+            rx_out = rx_decode(rx_inp, qam16)
             rew += np.linalg.norm(np.array(b) - rx_out, ord=1)
 
         print ("\n######## Epoch %d ########" % i)
@@ -256,4 +256,4 @@ if __name__ == '__main__':
         print ("wall clock time: %.4f ms" % ((end - start)*1000))
 
         if i % 10 == 0:
-            nt.constellation(iteration=i, groundtruth=psk)
+            nt.constellation(iteration=i, groundtruth=qam16)
