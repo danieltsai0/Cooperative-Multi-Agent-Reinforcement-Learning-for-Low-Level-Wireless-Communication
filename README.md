@@ -17,12 +17,15 @@ fixed Tx, learn Rx:
 
 
 tasks:
-1. fix Tx, learn Rx - Daniel (plot decision boundaries)
-2. fix Rx, learn Tx - Shane
-⋅⋅⋅network arch, noise, episode length, lambda, 
-⋅⋅⋅tweak channel impairments
-4. ~~varaible length case~~ Equaliser Rx - Albert
-5. info theory / one page writeup - Colin
+1. reward shaping for transmitter (need to restrict power and maximize distance between points. former must be stronger than latter to prevent outer points from flying away)
+
+1st: Tx -> Rx and Rx gives reward back to Tx. Rx provides k-nn guess for each datasample back to Tx
+2nd: Tx on both sides, Rx on both sides. 
+3rd: OpenAI style
+
+![Alt text](https://c1.staticflickr.com/3/2929/33290540844_2afbbcd75d_b.jpg )
+
+
 
 ## Reports
 ### CS294-121: 

@@ -48,12 +48,57 @@ def fancy_slice_2d(X, inds0, inds1):
 
 ############################################################
 #
-#  Misc utility functions and variables
+#  Misc utility maps
 #
 ############################################################ 
 
-def polar_to_cartesian(r, theta):
-    return r * np.array([np.cos(theta), np.sin(theta)])
+# Useful maps
+color_map = {
+            0: 'deepskyblue',
+            1: 'orangered',
+            2: 'm',
+            3: 'lime',
+            4: 'skyblue',
+            5: 'lightsalmon',
+            6: 'fuchsia',
+            7: 'palegreen',
+            8: 'lightskyblue',
+            9: 'coral',
+            10: 'violet',
+            11: 'mediumseagreen',
+            12: 'steelblue',
+            13: 'maroon',
+            14: 'hotpink',
+            15: 'springgreen'
+        }
+
+qam16_legend_map = {
+            0: '(0,0,0,0)',
+            1: '(0,0,0,1)',
+            2: '(0,0,1,0)',
+            3: '(0,0,1,1)',
+            4: '(0,1,0,0)',
+            5: '(0,1,0,1)',
+            6: '(0,1,1,0)',
+            7: '(0,1,1,1)',
+            8: '(1,0,0,0)',
+            9: '(1,0,0,1)',
+            10: '(1,0,1,0)',
+            11: '(1,0,1,1)',
+            12: '(1,1,0,0)',
+            13: '(1,1,0,1)',
+            14: '(1,1,1,0)',
+            15: '(1,1,1,1)',
+        }
+psk_legend_map = {
+            0: '(0,0)',
+            1: '(0,1)',
+            2: '(1,0)',
+            3: '(1,1)'
+        }
+
+inv_qam16_legend_map = {v: k for k, v in qam16_legend_map.items()}
+inv_psk_legend_map = {v: k for k, v in psk_legend_map.items()}
 
 psk = {
         (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
@@ -81,6 +126,13 @@ qam16 = {
         (1, 1, 1, 1): 1.0/np.sqrt(2)*np.array([-2, -2])
     }
 
+
+############################################################
+#
+#  Misc utility functions
+#
+############################################################ 
+
 def int_to_coord(x, n_bits):
     bin_rep = [int(y) for y in "{0:b}".format(x)]
     pad = n_bits - len(bin_rep)
@@ -89,3 +141,13 @@ def int_to_coord(x, n_bits):
 
 def zero_to_neg_one(x):
     return 2 * (x - .5)
+
+def polar_to_cartesian(r, theta):
+    return r * np.array([np.cos(theta), np.sin(theta)])
+
+def get_mod_stuff(n_bits):
+    if n_bits == 2:
+        return psk, psk_legend_map, inv_psk_legend_map
+
+    if n_bits == 4:
+        return qam16, qam16_legend_map, inv_qam16_legend_map

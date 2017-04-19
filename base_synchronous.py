@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 import math
 
 # Modulation statics
-n_bits = 2
+n_bits = 4
 n_input = 1
-mod_scheme = psk
+mod_scheme, legend_map, inv_legend_map = get_mod_stuff(n_bits)
 # Learning statics
 steps_per_episode = 128
 train_iter = 2000
@@ -29,7 +29,7 @@ rx_stepsize = 1e-2
 
 
 # define environment and neural Rx
-env = Environment(n_bits=n_bits, l=.05, noise=lambda x: x + np.random.normal(loc=0.0, scale=.5, size=2))
+env = Environment(n_bits=n_bits, l=.05, noise=lambda x: x + np.random.normal(loc=0.0, scale=.3, size=2))
 nt = NeuralTransmitter(n_bits=n_bits, steps_per_episode=steps_per_episode)
 nr = NeuralReceiver(n_bits=n_bits, n_input=n_input)
 
@@ -83,4 +83,4 @@ for i in range(train_iter):
         print("iteration number",i)
         print("avg reward for this episode:",np.average(rx_adv))
         nt.constellation(iteration=i, groundtruth=mod_scheme)
-        nr.draw_boundaries(title, fn_base, i)
+        nr.draw_boundaries(title, fn_base, i, legend_map, inv_legend_map)

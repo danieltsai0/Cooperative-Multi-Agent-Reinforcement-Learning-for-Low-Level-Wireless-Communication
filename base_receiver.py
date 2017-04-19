@@ -119,21 +119,7 @@ class NeuralReceiver:
         return action     
 
 
-    def draw_boundaries(self, title, fn, iteration):
-        # Useful maps
-        color_map = {
-                    0: 'deepskyblue',
-                    1: 'orangered',
-                    2: 'fuchsia',
-                    3: 'lime'
-                }
-        legend_map = {
-                    0: '(0,0)',
-                    1: '(0,1)',
-                    2: '(1,0)',
-                    3: '(1,1)'
-                }
-        inv_legend_map = {v: k for k, v in legend_map.items()}
+    def draw_boundaries(self, title, fn, iteration, legend_map, inv_legend_map):
 
         # Generate graph points
         points = np.mgrid[-1.5:1.5:.05, -1.5:1.5:.05].transpose(1,2,0)
@@ -150,8 +136,11 @@ class NeuralReceiver:
         for e in np.c_[points,actions]:
             elems[int(e[2])] = plt.plot(e[0], e[1], 'o', color=color_map[e[2]], label=legend_map[e[2]], ms=6, mew=2)[0]
 
+        for i,e in enumerate(elems):
+            if e == None:
+                elems[i] = plt.plot(label=legend_map[e[2]])
         # plt.legend()
-        leg = ax.legend(handles=elems)
+        leg = ax.legend(handles=elems,prop={'size':6})
 
         for text in leg.get_texts():
             text.set_color(color_map[inv_legend_map[text.get_text()]])

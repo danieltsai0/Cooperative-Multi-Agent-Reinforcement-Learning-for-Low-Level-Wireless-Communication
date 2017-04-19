@@ -1,0 +1,1 @@
+reward shaping for transmitter (need to restrict power and maximize distance between points. former must be stronger than latter to prevent outer points from flying away)
