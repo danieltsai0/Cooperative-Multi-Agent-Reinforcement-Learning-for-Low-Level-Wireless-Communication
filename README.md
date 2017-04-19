@@ -16,12 +16,13 @@ fixed Tx, learn Rx:
 ⋅⋅⋅input x,y of complex, softmax output + eps greedy / boltzman exploration
 
 
+## 4/18/17:
 tasks:
 1. reward shaping for transmitter (need to restrict power and maximize distance between points. former must be stronger than latter to prevent outer points from flying away)
 
-1st: Tx -> Rx and Rx gives reward back to Tx. Rx provides k-nn guess for each datasample back to Tx
-2nd: Tx on both sides, Rx on both sides. 
-3rd: OpenAI style
+2. Tx -> Rx and Rx gives reward back to Tx. Rx provides k-nn guess for each datasample back to Tx
+3. Tx on both sides, Rx on both sides. 
+4. OpenAI style
 
 ![Alt text](https://c1.staticflickr.com/3/2929/33290540844_2afbbcd75d_b.jpg )
 
