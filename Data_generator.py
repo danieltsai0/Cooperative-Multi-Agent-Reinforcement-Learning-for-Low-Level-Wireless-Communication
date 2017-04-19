@@ -21,7 +21,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from cmath import rect
 # commpy dependency has to be installed
-from commpy.filters import rrcosfilter
+from commpy.filters import rrcosfilter, rcosfilter
 sq2 = np.sqrt(2)
 
 
@@ -88,13 +88,13 @@ class Data_generator(object):
         return (data_raw, data_mod)
 
     
-    def get_pulseshaped_data(self, num, mod, os, length, alpha=0.35, Ts=1e-6, Fs=1e6):
+    def get_pulseshaped_data(self, num, mod, os, length=None, alpha=0.35):
         """ generates random, oversampled and root-raised cosine filtered data
             INPUT:
                 num:
                 mod:
                 os: oversampling factor
-                length: length of the rrc filter
+                length: length of the rc filter
                 alpha: roll-off factor
                 Ts: symbol period
                 Fs: sampling rate
@@ -103,33 +103,42 @@ class Data_generator(object):
                 data_mod: complex valued np.array with modulated data
                 data_os: complex valued np.array with oversampled data
                 data_shaped: complex valued np.array with pulse-shaped data
-                rrc: coefficients of the RRC filter
+                rc: coefficients of the RC filter
         """
-        Ts = (os/2)*1e-6
-        Fs = 1e6
+        # empirical values
+        Ts = 8e-6
+        Fs = 2*0.625e5*os
+        length = 8*os if length==None else length
+
         data_raw, data_mod = self.get_random_data(num, mod)        
-        rrc = rrcosfilter(length, alpha, Ts, Fs)[1]
+        rc = rcosfilter(length, alpha, Ts, Fs)[1]
         os_filter = np.zeros(os)
         os_filter[0] = 1        
         data_os = np.kron(data_mod, os_filter)
         # center ramp up and ramp down of filter        
         data_os = np.concatenate([np.zeros(os/2), data_os[:-os/2]])        
-        data_shaped = np.convolve(rrc, data_os)
+        data_shaped = np.convolve(rc, data_os)
         # center the filter
         data_shaped = data_shaped[length/2:-length/2+1]       
-        return (data_raw, data_mod, data_os, data_shaped, rrc)
+        return (data_raw, data_mod, data_os, data_shaped, rc)
 
 def _main_showcase():
     
     # for testing the pulseshaped generator
+    # os=16, filter=128, a=0.35, Ts=8e-6, fs=1e6
+    # os=8, filter=64, a=0.35, Ts=4e-6, fs=1e6
+    # os=4, filter=32
+
     generator = Data_generator()
-    data_raw, data_mod, data_os, data_shaped, rrc = generator.get_pulseshaped_data(1000, 'qpsk', 16, 128)
+    data_raw, data_mod, data_os, data_shaped, rc = generator.get_pulseshaped_data(1000, '8psk', 16)
     print data_raw.shape, data_mod.shape, data_os.shape, data_shaped.shape
+    plt.plot(rc)
+    plt.figure()
     plt.stem(data_os[:12*16].real, axis=0)
     plt.plot(data_shaped[:12*16].real,'r')
-    plt.show()
-    
-    plt.scatter(data_shaped.real[:64], data_shaped.imag[:64], color='red')
+    plt.show(block=False)
+    plt.figure() 
+    plt.scatter(data_shaped.real[:16*8], data_shaped.imag[:16*8], color='red')
     plt.scatter(data_mod.real[:64], data_mod.imag[:64], color='blue')
     plt.show()
     
@@ -176,15 +185,15 @@ def main():
     
     if (pulse): # generate pulse shaped data
     
-        data = generator.get_pulseshaped_data(num, mod, os, length)
-        # data = (data_raw, data_mod, data_os, data_shaped, rrc)
+        data = generator.get_pulseshaped_data(num, mod, os)
+        # data = (data_raw, data_mod, data_os, data_shaped, rc)
 
         # save the data 
         pickle.dump(data, pck_file)
         pck_file.close()
 
         print("Generated %d random samples with '%s' modulation." % (num, mod))
-        print("Signal is oversampled by a factor of %d and filtered with a rrc filter of length %d" % (os, length))
+        print("Signal is oversampled by a factor of %d and filtered with a rc filter of length %d" % (os, length))
         print("Data has been saved in %s.pck" % directory)
 
     else: # generate normal data
@@ -202,6 +211,7 @@ def main():
 #+its output in a pickle file. run python Data_generator.py -h for help
 if (__name__ == "__main__"):
     print("Running data generator in command line mode...")
+    #main_showcase()
     main() 
     
 
