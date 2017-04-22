@@ -156,5 +156,5 @@ def get_mod_vars(n_bits):
 Outputs:
     preamble: random matrix of shape (size,n_bits) of -1 and 1
 """
-def generate_preamble(self, size, n_bits):
+def generate_preamble(size, n_bits):
     return 2*(np.random.randint(0,2,[size,n_bits])-.5)
