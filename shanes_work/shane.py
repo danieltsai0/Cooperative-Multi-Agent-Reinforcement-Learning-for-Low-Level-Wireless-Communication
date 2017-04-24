@@ -5,8 +5,7 @@
 #
 #  Simulates a learning transmitter with a fixed receiver.
 #
-############################################################ 
-
+############################################################
 
 from environment import Environment
 import tensorflow as tf
@@ -16,7 +15,7 @@ import itertools
 import matplotlib.pyplot as plt
 import time
 
-# normalized constant initializer from cs 294-112 code
+# normalized constant initializer for NN weights from cs 294-112 code
 def normc_initializer(std=1.0):
     def _initializer(shape, dtype=None, partition_info=None):
         out = np.random.randn(*shape).astype(np.float32)
@@ -25,9 +24,12 @@ def normc_initializer(std=1.0):
     return _initializer
 
 class NeuralTransmitter(object):
-    def __init__(self, n_bits=2, n_hidden=64, steps_per_episode=32, stepsize=5e-3, polar=False):
+    def __init__(self, n_bits=2, num_hidden_per_layer=[64, 32], steps_per_episode=32, stepsize=5e-3, polar=False):
+
+        self.n_hidden_layers = len(num_hidden_per_layer)
+        self.num_hidden_per_layer = num_hidden_per_layer
+
         self.n_bits = n_bits
-        self.n_hidden = n_hidden
         self.steps_per_episode = steps_per_episode
         self.stepsize = stepsize
         self.polar = polar
@@ -39,44 +41,34 @@ class NeuralTransmitter(object):
 
         # Network
         self.sy_x = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.sy_x_actions = tf.placeholder(tf.float32, [None]) # x actions for gradient calculation
-        self.sy_y_actions = tf.placeholder(tf.float32, [None]) # y actions for gradient calculation
+        self.sy_actions = tf.placeholder(tf.float32, [None, 2]) # x actions for gradient calculation
         self.sy_adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
         self.sy_stepsize = tf.placeholder(shape=[], dtype=tf.float32) # stepsize for gradient step
 
-        # Hidden Layer
-        self.h2 = tf.contrib.layers.fully_connected(
-            inputs = self.sy_x,
-            num_outputs = self.n_hidden,
-            activation_fn = tf.nn.relu, # relu activation for hidden layer
-            weights_initializer = normc_initializer(.1),
-            biases_initializer = tf.constant_initializer(.1)
-        )
+        # Hidden Layers
+        self.layers = [self.sy_x]
+        for i in range(self.n_hidden_layers):
+            h = tf.contrib.layers.fully_connected(
+                inputs = self.layers[-1],
+                num_outputs = self.num_hidden_per_layer[i],
+                activation_fn = tf.nn.relu, # relu activation for hidden layer
+                weights_initializer = normc_initializer(1.0),
+                biases_initializer = tf.constant_initializer(.1)
+            )
+            self.layers.append(h)
 
-        self.h1 = tf.contrib.layers.fully_connected(
-            inputs = self.h2,
-            num_outputs = self.n_hidden,
-            activation_fn = tf.nn.relu, # relu activation for hidden layer
-            weights_initializer = normc_initializer(.1),
-            biases_initializer = tf.constant_initializer(.1)
-        )
+        self.h_last = self.layers[-1]
 
         # Outputs
         if self.polar:
-            self.r_mean = tf.squeeze(tf.contrib.layers.fully_connected (
-                    inputs = self.h1,
-                    num_outputs = 1,
+            self.r_theta_mean = tf.squeeze(tf.contrib.layers.fully_connected (
+                    inputs = self.h_last,
+                    num_outputs = 2,
                     activation_fn = None,
                     weights_initializer = normc_initializer(1.0),
                     biases_initializer = tf.constant_initializer(0.0)
                 ))
-            self.theta_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                    inputs = self.h1,
-                    num_outputs = 1,
-                    activation_fn = None, # tanh for -1 to 1
-                    weights_initializer = normc_initializer(1.0),
-                    biases_initializer = tf.constant_initializer(-.1*self.n_hidden)
-                ))
+            ipy.embed()
             self.r_logstd = tf.Variable(-1.)
             self.theta_logstd = tf.Variable(0.)
             self.r_distr = tf.contrib.distributions.Normal(self.r_mean, tf.exp(self.r_logstd))
@@ -89,14 +81,14 @@ class NeuralTransmitter(object):
             self.sy_y_sample = self.sy_r_sample * tf.sin(self.sy_theta_sample)
         else:
             self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                    inputs = self.h1,
+                    inputs = self.h_last,
                     num_outputs = 1,
                     activation_fn = None,
                     weights_initializer = normc_initializer(.2),
                     biases_initializer = tf.constant_initializer(0.0)
                 ))
             self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                    inputs = self.h1,
+                    inputs = self.h_last,
                     num_outputs = 1,
                     activation_fn = None,
                     weights_initializer = normc_initializer(.2),
@@ -109,14 +101,18 @@ class NeuralTransmitter(object):
             self.sy_x_sample = self.x_distr.sample()
             self.sy_y_sample = self.y_distr.sample()
 
+        # Compute log-probabilities for gradient estimation
         if self.polar:
             self.r_logprob = self.r_distr.log_prob(tf.sqrt(self.sy_x_actions**2 + self.sy_y_actions**2))
             self.theta_logprob = self.theta_distr.log_prob(tf.atan(self.sy_y_actions / self.sy_x_actions))
             self.sy_surr = - tf.reduce_mean(self.sy_adv * (self.theta_logprob + self.r_logprob))
+
         else:
             self.x_logprob = self.x_distr.log_prob(self.sy_x_actions)
             self.y_logprob = self.y_distr.log_prob(self.sy_y_actions)
             self.sy_surr = - tf.reduce_mean(self.sy_adv * (self.x_logprob + self.y_logprob))
+            ipy.embed()
+            self.old_x_distr = tf.contrib.distributions.Normal(tf.Variable([self.old_x_means, self.old_y_means], tf.Variable([tf.exp(self.old_x_logstd), tf.exp(self.old_y_logstd)])))
 
         self.update_op = tf.train.AdamOptimizer(self.sy_stepsize).minimize(self.sy_surr)
 
@@ -185,8 +181,8 @@ class NeuralTransmitter(object):
         """
         bitstrings = list(itertools.product([0, 1], repeat=self.n_bits))
 
-        plt.figure(figsize=(16, 16))
-        size = 20
+        plt.figure(figsize=(4, 4))
+        size = 5
 
         for bs in bitstrings:
             x,y = self.transmit(np.array(bs)[None], evaluate=True)
@@ -216,47 +212,16 @@ def rx_decode(rx_inp, decoding_map):
             dist = d
     return rx_out
 
-if __name__ == '__main__':
-    # set random seeds
-    # tf.set_random_seed(0)
-    # np.random.seed(0)
+def run_simulation(n_bits, l, seed, steps_per_episode, polar, stepsize, num_hidden_per_layer, decoding_map, sigma):
 
-    # page 570 of (Proakis, Salehi)
-    psk = {
-        (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
-        (0, 1): 1.0/np.sqrt(2)*np.array([-1, 1]),
-        (1, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
-        (1, 1): 1.0/np.sqrt(2)*np.array([-1,-1])
-    }
+    # set seed
+    tf.set_random_seed(seed)
+    np.random.seed(seed)
 
-    qam16 = {
-        (0, 0, 0, 0): 0.5/np.sqrt(2)*np.array([1, 1]),
-        (0, 0, 0, 1): 0.5/np.sqrt(2)*np.array([3, 1]),
-        (0, 0, 1, 0): 0.5/np.sqrt(2)*np.array([1, 3]),
-        (0, 0, 1, 1): 0.5/np.sqrt(2)*np.array([3, 3]),
-        (0, 1, 0, 0): 0.5/np.sqrt(2)*np.array([1, -1]),
-        (0, 1, 0, 1): 0.5/np.sqrt(2)*np.array([1, -3]),
-        (0, 1, 1, 0): 0.5/np.sqrt(2)*np.array([3, -1]),
-        (0, 1, 1, 1): 0.5/np.sqrt(2)*np.array([3, -3]),
-        (1, 0, 0, 0): 0.5/np.sqrt(2)*np.array([-1, 1]),
-        (1, 0, 0, 1): 0.5/np.sqrt(2)*np.array([-1, 3]),
-        (1, 0, 1, 0): 0.5/np.sqrt(2)*np.array([-3, 1]),
-        (1, 0, 1, 1): 0.5/np.sqrt(2)*np.array([-3, 3]),
-        (1, 1, 0, 0): 0.5/np.sqrt(2)*np.array([-1, -1]),
-        (1, 1, 0, 1): 0.5/np.sqrt(2)*np.array([-3, -1]),
-        (1, 1, 1, 0): 0.5/np.sqrt(2)*np.array([-1, -3]),
-        (1, 1, 1, 1): 0.5/np.sqrt(2)*np.array([-3, -3])
-    }
-
-    # parameters
-    decoding_map = psk
-    n_bits = int(np.log2(len(decoding_map.keys())))
-    l = .1
-    steps_per_episode = 4096
-
-    # instantiate environment and transmitter
-    env = Environment(n_bits=n_bits, l=l)
-    nt = NeuralTransmitter(n_bits=n_bits, steps_per_episode=steps_per_episode, polar=False, stepsize=5e-3)
+    # instantiate environment
+    env = Environment(n_bits=n_bits, l=l, sigma=sigma)
+    # instantiate transmitter
+    nt = NeuralTransmitter(n_bits=n_bits, steps_per_episode=steps_per_episode, polar=polar, stepsize=stepsize, num_hidden_per_layer=num_hidden_per_layer)
 
     # training and evaluation
     for i in range(1000):
@@ -297,3 +262,43 @@ if __name__ == '__main__':
 
         if i % 10 == 0:
             nt.constellation(iteration=i, groundtruth=decoding_map)
+
+if __name__ == '__main__':
+    # page 570 of (Proakis, Salehi)
+    psk = {
+        (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
+        (0, 1): 1.0/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
+        (1, 1): 1.0/np.sqrt(2)*np.array([-1,-1])
+    }
+
+    qam16 = {
+        (0, 0, 0, 0): 0.5/np.sqrt(2)*np.array([1, 1]),
+        (0, 0, 0, 1): 0.5/np.sqrt(2)*np.array([3, 1]),
+        (0, 0, 1, 0): 0.5/np.sqrt(2)*np.array([1, 3]),
+        (0, 0, 1, 1): 0.5/np.sqrt(2)*np.array([3, 3]),
+        (0, 1, 0, 0): 0.5/np.sqrt(2)*np.array([1, -1]),
+        (0, 1, 0, 1): 0.5/np.sqrt(2)*np.array([1, -3]),
+        (0, 1, 1, 0): 0.5/np.sqrt(2)*np.array([3, -1]),
+        (0, 1, 1, 1): 0.5/np.sqrt(2)*np.array([3, -3]),
+        (1, 0, 0, 0): 0.5/np.sqrt(2)*np.array([-1, 1]),
+        (1, 0, 0, 1): 0.5/np.sqrt(2)*np.array([-1, 3]),
+        (1, 0, 1, 0): 0.5/np.sqrt(2)*np.array([-3, 1]),
+        (1, 0, 1, 1): 0.5/np.sqrt(2)*np.array([-3, 3]),
+        (1, 1, 0, 0): 0.5/np.sqrt(2)*np.array([-1, -1]),
+        (1, 1, 0, 1): 0.5/np.sqrt(2)*np.array([-3, -1]),
+        (1, 1, 1, 0): 0.5/np.sqrt(2)*np.array([-1, -3]),
+        (1, 1, 1, 1): 0.5/np.sqrt(2)*np.array([-3, -3])
+    }
+
+    general_params = dict()
+    params = [
+        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, steps_per_episode=1000, polar=False, stepsize=1e-3, num_hidden_per_layer=[64, 10], **general_params),
+        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, steps_per_episode=1000, polar=True, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params),
+        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, steps_per_episode=1000, polar=False, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params),
+        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, steps_per_episode=1000, polar=True, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params)
+    ]
+
+    for param in params:
+        run_simulation(**param)
+
