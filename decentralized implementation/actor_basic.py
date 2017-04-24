@@ -14,6 +14,7 @@ class ActorBasic():
 	"""
 	Inputs:
 		t_or_x (Boolean), represents whether the actor is a transmitter or receiver
+		args, represents initializer arguments for unit
 	"""
 	def __init__(self, t_or_x, args):
 		self.unit = NeuralTransmitter(*args) if t_or_x else KnnReceiver(*args)

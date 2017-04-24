@@ -24,7 +24,7 @@ Inputs:
 Outputs:
     most_frequent_row: the vector that occurred most frequently in the input
 """
-def mode_rows(a, label):
+def mode_rows(a):
     a = np.ascontiguousarray(a)
     void_dt = np.dtype((np.void, a.dtype.itemsize * a.shape[1]))
     _,ids, count = np.unique(a.view(void_dt).ravel(), \
@@ -33,8 +33,24 @@ def mode_rows(a, label):
     most_frequent_row = a[largest_count_id]
     return most_frequent_row[None]
 
+"""
+Inputs:
+    a: a numpy array of size (?,num_bits)
+    label: the correct label of the transmission
+
+Outputs:
+    percentage of labels that were correct in a
+"""
+# def percent_correct(a, label):
+#     a = np.ascontiguousarray(a)
+#     void_dt = np.dtype((np.void, a.dtype.itemsize * a.shape[1]))
+#     a = a.view(void_dt).ravel()
+#     label = label.view(void_dt).ravel()
+#     return np.count_nonzero(a==label) / a.shape[0]
+
 
 """
+Used for interpreting preamble signal.
 Inputs:
     data:    numpy array of complex numbers
              shape: (?,)
@@ -48,64 +64,59 @@ Outputs:
              on k nearest neighbors
              shape: (?, num_bits)
 """
-def knn(k, data, labels, func):
+def knn_preamble(k, data, labels, func):
     output = np.empty((0, labels.shape[1]))
     i = 0
     for d in data:
         dist = np.linalg.norm(d-data,axis=1)
         idx = dist.argsort()[1:k+1]
-        output = np.r_[output,func(labels[idx,:], labels[i,:])]
+        output = np.r_[output,func(labels[idx,:])]
         i += 1
 
     return output
 
 """
-Inputs:
-    a: a numpy array of size (?,num_bits)
-    label: the correct label of the transmission
-
-Outputs:
-    percentage of labels that were correct in a
+Used for interpreting premable signal.
 """
-def percent_correct(a, label):
-    a = np.ascontiguousarray(a)
-    void_dt = np.dtype((np.void, a.dtype.itemsize * a.shape[1]))
-    a = a.view(void_dt).ravel()
-    label = label.view(void_dt).ravel()
-    return np.count_nonzero(a==label) / a.shape[0]
+def knn_reward(k, data, labels, signal, func):
+    output = np.empty((0, labels.shape[1]))
+    i = 0
+    for d in signal:
+        dist = np.linalg.norm(d-data,axis=1)
+        idx = dist.argsort()[:k]
+        output = np.r_[output,func(labels[idx,:])]
+        i += 1
+
+    return output
+
 
 """
 This relies on a the transmitter sending a preamble, which was 
 agreed upon by both sides beforehand. 
 """
 class KnnReceiver():
-    def __init__(self, preamble, size_of_episode, n_bits, k, l_or_p):
-        self.preamble = preamble
-        self.guesses = None
+    def __init__(self, n_bits, k, l_or_p):
+        self.preamble_mod = None # Modulated preamble
+        self.preamble_bit = None # Bit repr preamble
+        self.mod_mod = None # Modulated reward
         self.k = k
         self.func = mode_rows if l_or_p else percent_correct
-
-        # values for keeping track of where we are in the preamble
-        self.size_of_episode = size_of_episode
-        self.index = 0
-        self.max_index = (self.preamble.shape[0] // size_of_episode) - 1
 
     # Receive signal from transmitter
     # Generates guesses, which represents the knn guess for each signal
     # Can change reward to be % of correct labels in k nearest neighbors
-    def receive(self, signal):
-        data = signal
-        print("data.shape:",data.shape)
-        labels = self.preamble[self.index*self.size_of_episode:(self.index+1)*self.size_of_episode]
-        print("labels.shape:",labels.shape)
-        print("receiver index:",self.index)
-        self.index += 1 % self.max_index
-        self.output = knn(self.k, data, labels, self.func)
+    def receive(self, preamble_mod, preamble_bit):
+        self.preamble_mod = preamble_mod
+        # print("preamble_mod.shape:",self.preamble_mod.shape)
+        self.preamble_bit = preamble_bit
+        # print("preamble_bit.shape:",preamble_bit.shape)        
 
-    # Transmit guesses back to the transmitter
-    def transmit(self):
-        print("output.shape:",self.output.shape)
+    def generate_guess(self):
+        self.output = knn_preamble(self.k, self.preamble_mod, self.preamble_bit, self.func)
         return self.output
 
-    def visualize(self, iteration):
-        raise NotImplementedError
+    def generate_demod(self, reward_mod):
+        # print("reward_mod.shape:",reward_mod.shape)
+        self.reward_mod = reward_mod
+        self.output = knn_reward(self.k, self.preamble_mod, self.preamble_bit, self.reward_mod, self.func)
+        return self.output

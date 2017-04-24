@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import os
 
 ############################################################
 #
@@ -108,22 +109,22 @@ psk = {
     }
 
 qam16 = {
-        (0, 0, 0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
-        (0, 0, 0, 1): 1.0/np.sqrt(2)*np.array([2, 1]),
-        (0, 0, 1, 0): 1.0/np.sqrt(2)*np.array([1, 2]),
-        (0, 0, 1, 1): 1.0/np.sqrt(2)*np.array([2, 2]),
-        (0, 1, 0, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
-        (0, 1, 0, 1): 1.0/np.sqrt(2)*np.array([1, -2]),
-        (0, 1, 1, 0): 1.0/np.sqrt(2)*np.array([2, -1]),
-        (0, 1, 1, 1): 1.0/np.sqrt(2)*np.array([2, -2]),
-        (1, 0, 0, 0): 1.0/np.sqrt(2)*np.array([-1, 1]),
-        (1, 0, 0, 1): 1.0/np.sqrt(2)*np.array([-1, 2]),
-        (1, 0, 1, 0): 1.0/np.sqrt(2)*np.array([-2, 1]),
-        (1, 0, 1, 1): 1.0/np.sqrt(2)*np.array([-2, 2]),
-        (1, 1, 0, 0): 1.0/np.sqrt(2)*np.array([-1, -1]),
-        (1, 1, 0, 1): 1.0/np.sqrt(2)*np.array([-2, -1]),
-        (1, 1, 1, 0): 1.0/np.sqrt(2)*np.array([-1, -2]),
-        (1, 1, 1, 1): 1.0/np.sqrt(2)*np.array([-2, -2])
+        (0, 0, 0, 0): 1.0/np.sqrt(3)*np.array([1, 1]),
+        (0, 0, 0, 1): 1.0/np.sqrt(3)*np.array([2, 1]),
+        (0, 0, 1, 0): 1.0/np.sqrt(3)*np.array([1, 2]),
+        (0, 0, 1, 1): 1.0/np.sqrt(3)*np.array([2, 2]),
+        (0, 1, 0, 0): 1.0/np.sqrt(3)*np.array([1, -1]),
+        (0, 1, 0, 1): 1.0/np.sqrt(3)*np.array([1, -2]),
+        (0, 1, 1, 0): 1.0/np.sqrt(3)*np.array([2, -1]),
+        (0, 1, 1, 1): 1.0/np.sqrt(3)*np.array([2, -2]),
+        (1, 0, 0, 0): 1.0/np.sqrt(3)*np.array([-1, 1]),
+        (1, 0, 0, 1): 1.0/np.sqrt(3)*np.array([-1, 2]),
+        (1, 0, 1, 0): 1.0/np.sqrt(3)*np.array([-2, 1]),
+        (1, 0, 1, 1): 1.0/np.sqrt(3)*np.array([-2, 2]),
+        (1, 1, 0, 0): 1.0/np.sqrt(3)*np.array([-1, -1]),
+        (1, 1, 0, 1): 1.0/np.sqrt(3)*np.array([-2, -1]),
+        (1, 1, 1, 0): 1.0/np.sqrt(3)*np.array([-1, -2]),
+        (1, 1, 1, 1): 1.0/np.sqrt(3)*np.array([-2, -2])
     }
 
 
@@ -158,3 +159,10 @@ Outputs:
 """
 def generate_preamble(size, n_bits):
     return 2*(np.random.randint(0,2,[size,n_bits])-.5)
+
+def generate_id():
+    return int(np.random.rand()*100000%100000)
+
+def create_dir(dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
