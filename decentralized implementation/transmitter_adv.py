@@ -27,7 +27,7 @@ def normc_initializer(std=1.0):
     return _initializer
 
 class NeuralTransmitter(object):
-    def __init__(self, n_bits, n_hidden, stepsize, l, groundtruth, uid):
+    def __init__(self, n_bits, n_hidden, stepsize, l, groundtruth, preamble, uid):
         # Network parameters
         self.n_bits = n_bits
         self.n_hidden = n_hidden
@@ -35,14 +35,15 @@ class NeuralTransmitter(object):
         self.l = l # loss rate for power 
         # Misc. parameters
         self.groundtruth = groundtruth
+        self.preamble = preamble
         self.im_dir = 'figures/'+str(uid)+'/'
         create_dir(self.im_dir)
-        self.im_dir += '%d.png'
+        self.im_dir += '%04d.png'
 
         # Network
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.actions_x = tf.placeholder(tf.float32, [None]) # radius in polar coordinates
-        self.actions_y = tf.placeholder(tf.float32, [None]) # angle in radians
+        self.actions_x = tf.placeholder(tf.float32, [None]) # x
+        self.actions_y = tf.placeholder(tf.float32, [None]) # y
         self.adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
         # self.stepsize = tf.placeholder(shape=[], dtype=tf.float32)
 # 
@@ -52,7 +53,7 @@ class NeuralTransmitter(object):
             num_outputs = self.n_hidden,
             activation_fn = tf.nn.relu, # relu activation for hidden layer
             weights_initializer = normc_initializer(1.0),
-            biases_initializer = tf.constant_initializer(.1)
+            biases_initializer = tf.constant_initializer(0.0)
         )
 
         # Outputs
@@ -60,14 +61,14 @@ class NeuralTransmitter(object):
                 inputs = self.h1,
                 num_outputs = 1,
                 activation_fn = None,
-                weights_initializer = normc_initializer(1.0),
-                biases_initializer = tf.constant_initializer(1.5)
+                weights_initializer = normc_initializer(0.1),
+                biases_initializer = tf.constant_initializer(0.0)
             ))
         self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
                 inputs = self.h1,
                 num_outputs = 1,
                 activation_fn = None, 
-                weights_initializer = normc_initializer(1.0),
+                weights_initializer = normc_initializer(0.1),
                 biases_initializer = tf.constant_initializer(0.0)
             ))
         self.x_logstd = tf.Variable(0.)
@@ -116,7 +117,7 @@ class NeuralTransmitter(object):
     """
     # Receive reward signal from other agent. Should be of same length as actions
     def update(self, preamble_g_g_bit):
-        self.adv_accum = - self.ridge_loss(preamble_g_g_bit)
+        self.adv_accum = - self.lasso_loss(preamble_g_g_bit)
         # print("adv_accum.shape:",self.adv_accum.shape)  
         print("avg_reward:",np.average(self.adv_accum))  
         self.policy_update()
@@ -171,7 +172,7 @@ class NeuralTransmitter(object):
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
         """
-        bitstrings = list(itertools.product([0, 1], repeat=self.n_bits))
+        bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
 
         plt.figure(figsize=(4, 4))
         for bs in bitstrings:
@@ -188,6 +189,11 @@ class NeuralTransmitter(object):
                 x_gt, y_gt = self.groundtruth[k]
                 plt.scatter(x_gt, y_gt, s=5, color='purple')
                 plt.annotate(''.join([str(b) for b in k]), (x_gt, y_gt), size=5)
+        
+        
+        # plot modulated preamble
+        mod_preamble = self.transmit(self.preamble)
+        plt.scatter(mod_preamble[:,0], mod_preamble[:,1], alpha=0.05, color="red")
 
         plt.savefig(self.im_dir % iteration)
         plt.close()

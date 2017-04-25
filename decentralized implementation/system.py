@@ -14,7 +14,7 @@ class System():
     def __init__(self, n_bits, groundtruth):
         # General args
         preamble = generate_preamble(2**12,n_bits) 
-        size_of_episode = 2**7
+        size_of_episode = 2**9
         # Transmitter args
         n_hidden = 20
         stepsize = 1e-2
@@ -23,7 +23,7 @@ class System():
         k = 3
 
         self.channel_func = lambda x: x + np.random.normal(loc=0.0, scale=.2, size=[size_of_episode,2])
-        self.t_args = [n_bits, n_hidden, stepsize, l, groundtruth]
+        self.t_args = [n_bits, n_hidden, stepsize, l, groundtruth, preamble]
         self.r_args = [n_bits, k]
 
         self.actor_one = ActorAdvanced(preamble, size_of_episode, self.t_args, self.r_args)
@@ -58,7 +58,8 @@ class System():
         p_m_two, p_g_m_two = self.actor_two.transmit_preamble_g(p_g_b_two)
         p_g_g_b_one = self.actor_one.receive_preamble_g(self.channel.add_noise(p_m_two), self.channel.add_noise(p_g_m_two))
         self.actor_one.transmitter_update(p_g_g_b_one)
-        self.actor_one.visualize(i)
+        if (i%1==0):
+            self.actor_one.visualize(i)
 
     """
     Increment the index of the actors' preamble index
@@ -90,8 +91,8 @@ if __name__ == '__main__':
     np.random.seed(0)
     # Params
     n_bits = 2
-    groundtruth = psk
-    num_iterations = 2**7
+    groundtruth = qpsk
+    num_iterations = 2**9
 
     # Run
     sys = System(n_bits, groundtruth)
