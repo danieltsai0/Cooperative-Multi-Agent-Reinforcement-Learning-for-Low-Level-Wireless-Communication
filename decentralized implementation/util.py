@@ -73,6 +73,24 @@ color_map = {
             15: 'springgreen'
         }
 
+qpsk_legend_map = {
+            0: '(0,0)',
+            1: '(0,1)',
+            2: '(1,0)',
+            3: '(1,1)'
+        }
+
+psk8_legend_map = {
+            0: '(0,0,0)',
+            1: '(0,0,1)',
+            2: '(0,1,0)',
+            3: '(0,1,1)',
+            4: '(1,0,0)',
+            5: '(1,0,1)',
+            6: '(1,1,0)',
+            7: '(1,1,1)'
+        }
+
 qam16_legend_map = {
             0: '(0,0,0,0)',
             1: '(0,0,0,1)',
@@ -91,21 +109,28 @@ qam16_legend_map = {
             14: '(1,1,1,0)',
             15: '(1,1,1,1)',
         }
-qpsk_legend_map = {
-            0: '(0,0)',
-            1: '(0,1)',
-            2: '(1,0)',
-            3: '(1,1)'
-        }
 
-inv_qam16_legend_map = {v: k for k, v in qam16_legend_map.items()}
+    
 inv_qpsk_legend_map = {v: k for k, v in qpsk_legend_map.items()}
+inv_psk8_legend_map = {v: k for k, v in psk8_legend_map.items()}
+inv_qam16_legend_map = {v: k for k, v in qam16_legend_map.items()}
 
 qpsk = {
         (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
         (0, 1): 1.0/np.sqrt(2)*np.array([-1, 1]),
         (1, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
         (1, 1): 1.0/np.sqrt(2)*np.array([-1,-1])
+    }
+
+psk8 = {
+        (0, 0, 0): np.array([-1, -1])/np.sqrt(2),
+        (0, 0, 1): np.array([-1, 0]),
+        (0, 1, 0): np.array([0, 1]),
+        (0, 1, 1): np.array([-1, 1])/np.sqrt(2),
+        (1, 0, 0): np.array([0, -1]),
+        (1, 0, 1): np.array([1, -1])/np.sqrt(2),
+        (1, 1, 0): np.array([1, 1])/np.sqrt(2),
+        (1, 1, 1): np.array([1, 0])
     }
 
 qam16 = {
@@ -150,6 +175,9 @@ def get_mod_vars(n_bits):
     if n_bits == 2:
         return qpsk, qpsk_legend_map, inv_qpsk_legend_map
 
+    if n_bits == 3:
+        return psk8, psk8_legend_map, inv_psk8_legend_map
+
     if n_bits == 4:
         return qam16, qam16_legend_map, inv_qam16_legend_map
 
@@ -160,17 +188,9 @@ Outputs:
 def generate_preamble(size, n_bits):
     return 2*(np.random.randint(0,2,[size,n_bits])-.5)
 
-"""
-Outputs:
-    random int from 0 to 99,999
-"""
 def generate_id():
     return int(np.random.rand()*100000%100000)
 
-"""
-Inputs:
-    dirname: name of directory to be created if it doesn't exist
-"""
 def create_dir(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
