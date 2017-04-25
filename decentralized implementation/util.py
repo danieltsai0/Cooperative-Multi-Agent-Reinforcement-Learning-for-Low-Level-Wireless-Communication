@@ -160,9 +160,17 @@ Outputs:
 def generate_preamble(size, n_bits):
     return 2*(np.random.randint(0,2,[size,n_bits])-.5)
 
+"""
+Outputs:
+    random int from 0 to 99,999
+"""
 def generate_id():
     return int(np.random.rand()*100000%100000)
 
+"""
+Inputs:
+    dirname: name of directory to be created if it doesn't exist
+"""
 def create_dir(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
