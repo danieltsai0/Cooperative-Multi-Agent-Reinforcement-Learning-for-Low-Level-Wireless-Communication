@@ -10,6 +10,7 @@
 ############################################################ 
 
 from util import *
+from plot_const import visualize
 
 import tensorflow as tf
 import numpy as np
@@ -117,7 +118,7 @@ class NeuralTransmitter(object):
     """
     # Receive reward signal from other agent. Should be of same length as actions
     def update(self, preamble_g_g_bit):
-        self.adv_accum = - self.lasso_loss(preamble_g_g_bit)
+        self.adv_accum = - self.ridge_loss(preamble_g_g_bit)
         # print("adv_accum.shape:",self.adv_accum.shape)  
         print("avg_reward:",np.average(self.adv_accum))  
         self.policy_update()
@@ -173,31 +174,36 @@ class NeuralTransmitter(object):
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
         """
         bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
+        
+        fig = plt.figure(figsize=(8, 8))
+        plt.title('Constellation Diagram', fontsize=20)
+        ax = fig.add_subplot(111)
+        ax.set(ylabel='imaginary part', xlabel='real part')
 
-        plt.figure(figsize=(4, 4))
         for bs in bitstrings:
             x,y = self.evaluate(np.array(bs)[None])
-            plt.scatter(x, y, label=str(bs))
-            plt.annotate(str(bs), (x, y), size=5)
-        plt.axvline(0)
-        plt.axhline(0)
-        plt.xlim([-3., 3.])
-        plt.ylim([-3., 3.])
-
+            ax.scatter(x, y, label=str(bs), color='purple', marker="d")
+            x, y = x*0.5+0.5, y*0.5+0.5
+            ax.annotate(str(bs), (x, y), size=10)
+        ax.axvline(0, color='grey')
+        ax.axhline(0, color='grey')
+        #ax.grid()
+    
         if self.groundtruth:
             for k in self.groundtruth.keys():
                 x_gt, y_gt = self.groundtruth[k]
-                plt.scatter(x_gt, y_gt, s=5, color='purple')
-                plt.annotate(''.join([str(b) for b in k]), (x_gt, y_gt), size=5)
+                ax.scatter(x_gt, y_gt, s=5, color='purple')
+                # ax.annotate(''.join([str(b) for b in k]), (x_gt, y_gt), size=5)
         
         
         # plot modulated preamble
         mod_preamble = self.transmit(self.preamble)
-        plt.scatter(mod_preamble[:,0], mod_preamble[:,1], alpha=0.05, color="red")
+        ax.scatter(mod_preamble[:,0], mod_preamble[:,1], alpha=0.1, color="red")
 
+        plt.xlim([-3, 3])
+        plt.ylim([-3, 3])
         plt.savefig(self.im_dir % iteration)
         plt.close()
-
 
 
     ##################

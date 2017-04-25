@@ -58,7 +58,8 @@ class System():
         p_m_two, p_g_m_two = self.actor_two.transmit_preamble_g(p_g_b_two)
         p_g_g_b_one = self.actor_one.receive_preamble_g(self.channel.add_noise(p_m_two), self.channel.add_noise(p_g_m_two))
         self.actor_one.transmitter_update(p_g_g_b_one)
-        if (i%1==0):
+
+        if (i%5==0):
             self.actor_one.visualize(i)
 
     """
@@ -91,7 +92,7 @@ if __name__ == '__main__':
     np.random.seed(0)
     # Params
     n_bits = 2
-    groundtruth = qpsk
+    groundtruth = qpsk 
     num_iterations = 2**9
 
     # Run
