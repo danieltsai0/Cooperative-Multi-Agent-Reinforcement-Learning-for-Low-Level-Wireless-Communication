@@ -62,9 +62,9 @@ class System():
         # p_g indicates preamble guess
         # p_g_g indicates guess of the preamble guess
         p_m_one = self.actor_one.transmit_preamble()
-        p_g_b_two = self.actor_two.receive_preamble(pm_one)
+        p_g_b_two = self.actor_two.receive_preamble(p_m_one)
         p_m_two, p_g_m_two = self.actor_two.transmit_preamble_g(p_g_b_two)
-        p_g_g_b_one = self.actor_one.receive_reward(p_m_two, p_g_m_two)
+        p_g_g_b_one = self.actor_one.receive_preamble_g(p_m_two, p_g_m_two)
         self.actor_one.transmitter_update(p_g_g_b_one)
         self.actor_one.visualize(i)
 
