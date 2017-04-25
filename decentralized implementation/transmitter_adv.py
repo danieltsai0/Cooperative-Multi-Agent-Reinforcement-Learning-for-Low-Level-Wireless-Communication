@@ -3,7 +3,9 @@
 #  Basic Learning Transmitter
 #  Shane Barratt <stbarratt@gmail.com>
 #
-#  Simulates a learning transmitter with a fixed receiver.
+#  Network takes in a n_bit long sequence of bits and outputs 
+#  a continuous distribution over x and y, which denote the
+#  two axes in the complex plane.
 #
 ############################################################ 
 
@@ -30,7 +32,7 @@ class NeuralTransmitter(object):
         self.n_bits = n_bits
         self.n_hidden = n_hidden
         self.stepsize = stepsize
-        self.l = l
+        self.l = l # loss rate for power 
         # Misc. parameters
         self.groundtruth = groundtruth
         self.im_dir = 'figures/'+str(uid)+'/'
@@ -39,8 +41,8 @@ class NeuralTransmitter(object):
 
         # Network
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.actions_r = tf.placeholder(tf.float32, [None]) # radius in polar coordinates
-        self.actions_theta = tf.placeholder(tf.float32, [None]) # angle in radians
+        self.actions_x = tf.placeholder(tf.float32, [None]) # radius in polar coordinates
+        self.actions_y = tf.placeholder(tf.float32, [None]) # angle in radians
         self.adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
         # self.stepsize = tf.placeholder(shape=[], dtype=tf.float32)
 # 
@@ -54,86 +56,117 @@ class NeuralTransmitter(object):
         )
 
         # Outputs
-        self.r_mean = tf.squeeze(tf.contrib.layers.fully_connected (
+        self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected (
                 inputs = self.h1,
                 num_outputs = 1,
                 activation_fn = None,
                 weights_initializer = normc_initializer(1.0),
                 biases_initializer = tf.constant_initializer(1.5)
             ))
-        self.theta_mean = tf.squeeze(tf.contrib.layers.fully_connected(
+        self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
                 inputs = self.h1,
                 num_outputs = 1,
-                activation_fn = None, # tanh for -1 to 1
+                activation_fn = None, 
                 weights_initializer = normc_initializer(1.0),
                 biases_initializer = tf.constant_initializer(0.0)
             ))
-        self.r_logstd = tf.Variable(-1.)
-        self.theta_logstd = tf.Variable(0.)
-        self.r_std = tf.exp(self.r_logstd)
-        self.theta_std = tf.exp(self.theta_logstd)
+        self.x_logstd = tf.Variable(0.)
+        self.y_logstd = tf.Variable(0.)
+        self.x_std = tf.exp(self.x_logstd)
+        self.y_std = tf.exp(self.y_logstd)
 
         # randomized actions
-        self.r_distr = tf.contrib.distributions.Normal(self.r_mean, tf.exp(self.r_logstd))
-        self.theta_distr = tf.contrib.distributions.Normal(self.theta_mean, tf.exp(self.theta_logstd))
+        self.x_distr = tf.contrib.distributions.Normal(self.x_mean, self.x_std)
+        self.y_distr = tf.contrib.distributions.Normal(self.y_mean, self.y_std)
 
-        self.r_sample = self.r_distr.sample()
-        self.theta_sample = self.theta_distr.sample()
+        self.x_sample = self.x_distr.sample()
+        self.y_sample = self.y_distr.sample()
 
         # for forming surrogate loss
-        self.r_logprob = self.r_distr.log_prob(self.actions_r)
-        self.theta_logprob = self.theta_distr.log_prob(self.actions_theta)
+        self.x_logprob = self.x_distr.log_prob(self.actions_x)
+        self.y_logprob = self.y_distr.log_prob(self.actions_y)
 
-        self.surr = - tf.reduce_mean(self.adv * (self.theta_logprob + self.r_logprob))
+        self.surr = - tf.reduce_mean(self.adv * (self.y_logprob + self.x_logprob))
         self.update_op = tf.train.AdamOptimizer(self.stepsize).minimize(self.surr)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-
+    """
+    Updates the transmitter based on the input, x and y SAMPLE outputs
+    and the advantage (which is just the loss right now).
+    """
     def policy_update(self):
 
         self.sess.run([self.update_op], feed_dict={
                 self.input: self.trans_input,
-                self.actions_r: self.r_accum,
-                self.actions_theta: self.theta_accum,
+                self.actions_x: self.x_accum,
+                self.actions_y: self.y_accum,
                 self.adv: self.adv_accum,
                 # self.stepsize: self.stepsize
             })
 
+    """
+    Wrapper function for policy update. Receives the bit format of the guess of the 
+    preamble guess and computes a loss over it.
+
+    Inputs: 
+        preamble_g_g_bit: bit format of the guess of the preamble guess - taken from
+                          this Actor's receiver unit
+    """
     # Receive reward signal from other agent. Should be of same length as actions
-    def update(self, reward_bit):
-        self.adv_accum = - self.ridge_loss(reward_bit)
-        print("adv_accum.shape:",self.adv_accum.shape)  
+    def update(self, preamble_g_g_bit):
+        self.adv_accum = - self.ridge_loss(preamble_g_g_bit)
+        # print("adv_accum.shape:",self.adv_accum.shape)  
         print("avg_reward:",np.average(self.adv_accum))  
         self.policy_update()
 
-    # Transmit a signal
+    
+    """
+    Transmits the input signal as a sequence of complex numbers.
+
+    Inputs: 
+        signal: bit format signal
+
+    Outputs: 
+        modulated output: complex signal to be transmitted
+    """
     def transmit(self, signal):
         # get chunk of data to transmit
         self.trans_input = signal
         # print("trans_input.shape:",self.trans_input.shape)
         # run policy
-        theta, r = self.sess.run([self.theta_sample, self.r_sample], feed_dict={
+        x, y = self.sess.run([self.x_sample, self.y_sample], feed_dict={
                 self.input: self.trans_input
             })
         # store actions
-        self.r_accum = np.array(r)
-        self.theta_accum = np.array(theta)   
-        # print("r_accum.shape:",self.r_accum.shape) 
-        # print("theta_accum.shape:",self.theta_accum.shape)        
-        self.trans_output = (r * np.array([np.cos(theta), np.sin(theta)])).T
+        self.x_accum = np.array(x)
+        self.y_accum = np.array(y)   
+        # print("x_accum.shape:",self.x_accum.shape) 
+        # print("y_accum.shape:",self.y_accum.shape)        
+        self.trans_output = np.array([x,y]).T
+        # print("trans_output.shape:",self.trans_output.shape)
         return self.trans_output
 
+    """
+    Evaluates the means of the distribution for plotting purposes.
+
+    Inputs: 
+        data: bitwise array to be modulated
+    """
     def evaluate(self, data):
         # run policy
-        theta, r = self.sess.run([self.theta_mean, self.r_mean], feed_dict={
+        x, y = self.sess.run([self.x_mean, self.y_mean], feed_dict={
                 self.input: data
             })     
-        
-        return (r * np.array([np.cos(theta), np.sin(theta)])).T
+        return np.array([x,y]).T
 
-    # Visualize the decisions of the network
+    """
+    Visualize the centroids of the distributions of the network.
+
+    Inputs: 
+        iteration: used for plotting purposes
+    """
     def visualize(self, iteration):
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
@@ -159,10 +192,18 @@ class NeuralTransmitter(object):
         plt.savefig(self.im_dir % iteration)
         plt.close()
 
+
+
+    ##################
+    # Loss functions #
+    ##################
+
     """
-    Loss functions
+    L1 loss
+
+    Inputs:
+        signal: bit format signal to be compared to the original input
     """
-    # Input signal is the labels that the receiver received
     def lasso_loss(self, signal):
         # print("trans_output.shape:",self.trans_output.shape)
         # print("trans_output_sum.shape:",(self.l*np.sum(self.trans_output**2,axis=1)).shape)
@@ -171,5 +212,11 @@ class NeuralTransmitter(object):
         # print("linalg.shape:",np.linalg.norm(self.trans_input - signal, ord=1,axis=1).shape)
         return np.linalg.norm(self.trans_input - signal, ord=1, axis=1) + self.l*np.sum(self.trans_output**2,axis=1)
 
+    """
+    L2 loss
+
+    Inputs:
+        signal: bit format signal to be compared to the original input
+    """
     def ridge_loss(self, signal):
         return np.linalg.norm(self.trans_input - signal, axis=1) + self.l*np.sum(self.trans_output**2,axis=1)
