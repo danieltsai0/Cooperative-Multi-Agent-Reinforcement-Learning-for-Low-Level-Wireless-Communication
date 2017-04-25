@@ -2,6 +2,7 @@
 figures/
 *.png
 shanes_work/figures/
+*.gif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
