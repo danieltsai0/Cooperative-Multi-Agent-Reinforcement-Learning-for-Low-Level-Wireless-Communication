@@ -33,21 +33,6 @@ def mode_rows(a):
     most_frequent_row = a[largest_count_id]
     return most_frequent_row[None]
 
-"""
-Inputs:
-    a: a numpy array of size (?,num_bits)
-    label: the correct label of the transmission
-
-Outputs:
-    percentage of labels that were correct in a
-"""
-# def percent_correct(a, label):
-#     a = np.ascontiguousarray(a)
-#     void_dt = np.dtype((np.void, a.dtype.itemsize * a.shape[1]))
-#     a = a.view(void_dt).ravel()
-#     label = label.view(void_dt).ravel()
-#     return np.count_nonzero(a==label) / a.shape[0]
-
 
 """
 Used for interpreting preamble signal.
@@ -75,6 +60,7 @@ def knn_preamble(k, data, labels, func):
 
     return output
 
+
 """
 Used for interpreting premable signal.
 """
@@ -95,12 +81,12 @@ This relies on a the transmitter sending a preamble, which was
 agreed upon by both sides beforehand. 
 """
 class KnnReceiver():
-    def __init__(self, n_bits, k, l_or_p):
+    def __init__(self, n_bits, k):
         self.preamble_mod = None # Modulated preamble
         self.preamble_bit = None # Bit repr preamble
         self.mod_mod = None # Modulated reward
         self.k = k
-        self.func = mode_rows if l_or_p else percent_correct
+        self.func = mode_rows
 
     # Receive signal from transmitter
     # Generates guesses, which represents the knn guess for each signal

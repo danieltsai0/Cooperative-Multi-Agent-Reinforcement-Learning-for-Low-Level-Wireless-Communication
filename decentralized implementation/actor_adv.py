@@ -32,7 +32,7 @@ class ActorAdvanced():
 
     def transmit_preamble(self):
         preamble_bit = self.preamble[self.index*self.size_of_episode:(self.index+1)*self.size_of_episode]
-        print(str(self.id_num)+'s index is curretly: '+str(self.index))
+        # print(str(self.id_num)+'s index is curretly: '+str(self.index))
         return self.t_unit.transmit(preamble_bit)
 
     def transmit_preamble_g(self, preamble_g_bit):
@@ -44,7 +44,7 @@ class ActorAdvanced():
 
     def receive(self, preamble_mod):
         preamble_bit = self.preamble[self.index*self.size_of_episode:(self.index+1)*self.size_of_episode]
-        print(str(self.id_num)+'s index is curretly: '+str(self.index))
+        # print(str(self.id_num)+'s index is curretly: '+str(self.index))
         self.r_unit.receive(preamble_mod, preamble_bit)
 
     def receive_preamble(self, preamble_mod):
