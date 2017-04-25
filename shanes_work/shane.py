@@ -24,12 +24,13 @@ def normc_initializer(std=1.0):
     return _initializer
 
 class NeuralTransmitter(object):
-    def __init__(self, n_bits=2, num_hidden_per_layer=[64, 32], steps_per_episode=32, stepsize=5e-3, polar=False):
+    def __init__(self, n_bits=2, num_hidden_per_layer=[64, 32], steps_per_episode=32, stepsize=5e-3, polar=False, action_dim=2):
 
         self.n_hidden_layers = len(num_hidden_per_layer)
         self.num_hidden_per_layer = num_hidden_per_layer
 
         self.n_bits = n_bits
+        self.action_dim = action_dim
         self.steps_per_episode = steps_per_episode
         self.stepsize = stepsize
         self.polar = polar
@@ -41,9 +42,13 @@ class NeuralTransmitter(object):
 
         # Network
         self.sy_x = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.sy_actions = tf.placeholder(tf.float32, [None, 2]) # x actions for gradient calculation
+        self.sy_actions = tf.placeholder(tf.float32, [None, self.action_dim]) # x actions for gradient calculation
         self.sy_adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
         self.sy_stepsize = tf.placeholder(shape=[], dtype=tf.float32) # stepsize for gradient step
+        self.sy_batch_size = tf.placeholder(tf.int32, [])
+
+        self.sy_old_actions = tf.placeholder(tf.float32, [None, self.action_dim])
+        self.sy_old_logstds = tf.placeholder(tf.float32, [self.action_dim])
 
         # Hidden Layers
         self.layers = [self.sy_x]
@@ -61,58 +66,59 @@ class NeuralTransmitter(object):
 
         # Outputs
         if self.polar:
-            self.r_theta_mean = tf.squeeze(tf.contrib.layers.fully_connected (
+            self.r_theta_mean = tf.contrib.layers.fully_connected (
                     inputs = self.h_last,
-                    num_outputs = 2,
+                    num_outputs = self.action_dim,
                     activation_fn = None,
                     weights_initializer = normc_initializer(1.0),
                     biases_initializer = tf.constant_initializer(0.0)
-                ))
-            ipy.embed()
-            self.r_logstd = tf.Variable(-1.)
-            self.theta_logstd = tf.Variable(0.)
-            self.r_distr = tf.contrib.distributions.Normal(self.r_mean, tf.exp(self.r_logstd))
-            self.theta_distr = tf.contrib.distributions.Normal(self.theta_mean, tf.exp(self.theta_logstd))
-            self.sy_r_sample = self.r_distr.sample()
-            self.sy_theta_sample = self.theta_distr.sample()
-            self.x_mean = self.r_mean * tf.cos(self.theta_mean)
-            self.y_mean = self.r_mean * tf.sin(self.theta_mean)
-            self.sy_x_sample = self.sy_r_sample * tf.cos(self.sy_theta_sample)
-            self.sy_y_sample = self.sy_r_sample * tf.sin(self.sy_theta_sample)
+            )
+            self.r_theta_logstds = tf.Variable([-1., 0.])
+            self.r_theta_logstds = tf.reshape(self.r_theta_logstds, [-1, 1])
+            self.r_theta_logstds = tf.tile(self.r_theta_logstds, [1, self.sy_batch_size])
+            self.r_theta_logstds = tf.transpose(self.r_theta_logstds)
+
+            self.r_theta_distr = tf.contrib.distributions.MultivariateNormalDiag(self.r_theta_mean, tf.exp(self.r_theta_logstds))
+            self.r_theta_sample = self.r_theta_distr.sample()
+
+            # extract individual columns
+            self.r_sample = tf.gather(tf.transpose(self.r_theta_sample), 0)
+            self.theta_sample = tf.gather(tf.transpose(self.r_theta_sample), 1)
+            self.r_mean = tf.gather(tf.transpose(self.r_theta_mean), 0)
+            self.theta_mean = tf.gather(tf.transpose(self.r_theta_mean), 1)
+
+            self.action_means = tf.transpose(tf.stack([self.r_mean * tf.cos(self.theta_mean), self.r_mean * tf.sin(self.theta_mean)]))
+            self.action_sample = tf.transpose(tf.stack([self.r_sample * tf.cos(self.theta_sample), self.r_sample * tf.sin(self.theta_sample)]))
         else:
-            self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected(
+            self.action_means = tf.contrib.layers.fully_connected(
                     inputs = self.h_last,
-                    num_outputs = 1,
+                    num_outputs = self.action_dim,
                     activation_fn = None,
                     weights_initializer = normc_initializer(.2),
                     biases_initializer = tf.constant_initializer(0.0)
-                ))
-            self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                    inputs = self.h_last,
-                    num_outputs = 1,
-                    activation_fn = None,
-                    weights_initializer = normc_initializer(.2),
-                    biases_initializer = tf.constant_initializer(0.0)
-                ))
-            self.x_logstd = tf.Variable(-1.)
-            self.y_logstd = tf.Variable(-1.)
-            self.x_distr = tf.contrib.distributions.Normal(self.x_mean, tf.exp(self.x_logstd))
-            self.y_distr = tf.contrib.distributions.Normal(self.y_mean, tf.exp(self.y_logstd))
-            self.sy_x_sample = self.x_distr.sample()
-            self.sy_y_sample = self.y_distr.sample()
+            )
+            self.x_y_logstds = tf.Variable(tf.constant_initializer(-.1, self.action_dim))
+            self.x_y_logstds = tf.reshape(self.x_y_logstds, [-1, 1])
+            self.x_y_logstds = tf.tile(self.x_y_logstds, [1, self.sy_batch_size])
+            self.x_y_logstds = tf.transpose(self.x_y_logstds)
+
+            self.x_y_distr = tf.contrib.distributions.MultivariateNormalDiag(self.action_means, tf.exp(self.x_y_logstds))
+            self.action_sample = self.x_y_distr.sample()
+
+            self.x_y_old_distr = tf.contrib.distributions.MultivariateNormalDiag(self.sy_old_action_means, self.sy_old_logstds)
+
+            self.kl = tf.contrib.distributions.kl(self.x_y_old_distr, self.x_y_distr)
 
         # Compute log-probabilities for gradient estimation
         if self.polar:
-            self.r_logprob = self.r_distr.log_prob(tf.sqrt(self.sy_x_actions**2 + self.sy_y_actions**2))
-            self.theta_logprob = self.theta_distr.log_prob(tf.atan(self.sy_y_actions / self.sy_x_actions))
-            self.sy_surr = - tf.reduce_mean(self.sy_adv * (self.theta_logprob + self.r_logprob))
-
+            self.sy_x_actions = tf.gather(tf.transpose(self.sy_actions), 0)
+            self.sy_y_actions = tf.gather(tf.transpose(self.sy_actions), 1)
+            self.sy_r_theta_actions = tf.transpose(tf.stack([tf.sqrt(self.sy_x_actions**2 + self.sy_y_actions**2), tf.atan(self.sy_y_actions / self.sy_x_actions)]))
+            self.r_theta_logprob = self.r_theta_distr.log_prob(self.sy_r_theta_actions)
+            self.sy_surr = - tf.reduce_mean(self.sy_adv * self.r_theta_logprob)
         else:
-            self.x_logprob = self.x_distr.log_prob(self.sy_x_actions)
-            self.y_logprob = self.y_distr.log_prob(self.sy_y_actions)
-            self.sy_surr = - tf.reduce_mean(self.sy_adv * (self.x_logprob + self.y_logprob))
-            ipy.embed()
-            self.old_x_distr = tf.contrib.distributions.Normal(tf.Variable([self.old_x_means, self.old_y_means], tf.Variable([tf.exp(self.old_x_logstd), tf.exp(self.old_y_logstd)])))
+            self.x_y_logprob = self.x_y_distr.log_prob(self.sy_actions)
+            self.sy_surr = - tf.reduce_mean(self.sy_adv * self.x_y_logprob)
 
         self.update_op = tf.train.AdamOptimizer(self.sy_stepsize).minimize(self.sy_surr)
 
@@ -121,27 +127,21 @@ class NeuralTransmitter(object):
 
     def reset_accum(self):
         self.xs_accum = np.empty((0, self.n_bits))
-        self.x_accum = np.empty(0)
-        self.y_accum = np.empty(0)
+        self.actions_accum = np.empty((0, self.actions_dim))
         self.adv_accum = np.empty(0)
+
+        self.old_actions_accum = np.empty((0, self.actions_dim))
+        self.old_log_probs = np.empty((0, self.actions_dim))
 
     def policy_update(self):
         print ("updating policy")
-        if self.polar:
-            theta_logstd, r_logstd = self.sess.run([self.theta_logstd, self.r_logstd])
-            print ("theta_std:", np.exp(theta_logstd))
-            print ("r_std:", np.exp(r_logstd))
-        else:
-            x_logstd, y_logstd = self.sess.run([self.x_logstd, self.y_logstd])
-            print ("x_std:", np.exp(x_logstd))
-            print ("y_std:", np.exp(y_logstd))
 
         self.sess.run([self.update_op], feed_dict={
                 self.sy_x: self.xs_accum,
-                self.sy_x_actions: self.x_accum,
-                self.sy_y_actions: self.y_accum,
+                self.sy_actions: self.actions_accum,
                 self.sy_adv: self.adv_accum,
-                self.sy_stepsize: self.stepsize
+                self.sy_stepsize: self.stepsize,
+                self.sy_batch_size: self.actions_accum.shape[0]
             })
 
         self.reset_accum()
@@ -154,21 +154,23 @@ class NeuralTransmitter(object):
 
         # run policy
         if evaluate:
-            x, y = self.sess.run([self.x_mean, self.y_mean], feed_dict={
-                    self.sy_x: x_input
-            })
+            action = self.sess.run([self.action_means], feed_dict={
+                    self.sy_x: x_input,
+                    self.sy_batch_size: 1
+            })[0]
         else:
-            x, y = self.sess.run([self.sy_x_sample, self.sy_y_sample], feed_dict={
-                    self.sy_x: x_input
-                })
-            self.xs_accum = np.r_[self.xs_accum, x_input]
-            self.x_accum = np.r_[self.x_accum, np.array(x)[None]]
-            self.y_accum = np.r_[self.y_accum, np.array(y)[None]]
+            action = self.sess.run([self.action_sample], feed_dict={
+                    self.sy_x: x_input,
+                    self.sy_batch_size: 1
+            })[0]
 
-        return np.array([x, y])
+            self.xs_accum = np.r_[self.xs_accum, x_input]
+            self.actions_accum = np.r_[self.actions_accum, action]
+
+        return action[0]
 
     def receive_reward(self, rew):
-        self.adv_accum = np.r_[self.adv_accum, rew + 2.]
+        self.adv_accum = np.r_[self.adv_accum, rew]
 
         # If episode over, update policy and reset
         if self.step >= self.steps_per_episode:
@@ -291,12 +293,10 @@ if __name__ == '__main__':
         (1, 1, 1, 1): 0.5/np.sqrt(2)*np.array([-3, -3])
     }
 
-    general_params = dict()
+    general_params = dict(stepsize=1e-2, steps_per_episode=1000)
     params = [
-        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, steps_per_episode=1000, polar=False, stepsize=1e-3, num_hidden_per_layer=[64, 10], **general_params),
-        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, steps_per_episode=1000, polar=True, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params),
-        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, steps_per_episode=1000, polar=False, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params),
-        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, steps_per_episode=1000, polar=True, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params)
+        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, polar=False, num_hidden_per_layer=[64, 10], **general_params),
+        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, polar=False, num_hidden_per_layer=[64, 10], **general_params),
     ]
 
     for param in params:
