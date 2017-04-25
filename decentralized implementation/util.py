@@ -91,7 +91,7 @@ qam16_legend_map = {
             14: '(1,1,1,0)',
             15: '(1,1,1,1)',
         }
-psk_legend_map = {
+qpsk_legend_map = {
             0: '(0,0)',
             1: '(0,1)',
             2: '(1,0)',
@@ -99,9 +99,9 @@ psk_legend_map = {
         }
 
 inv_qam16_legend_map = {v: k for k, v in qam16_legend_map.items()}
-inv_psk_legend_map = {v: k for k, v in psk_legend_map.items()}
+inv_qpsk_legend_map = {v: k for k, v in qpsk_legend_map.items()}
 
-psk = {
+qpsk = {
         (0, 0): 1.0/np.sqrt(2)*np.array([1, 1]),
         (0, 1): 1.0/np.sqrt(2)*np.array([-1, 1]),
         (1, 0): 1.0/np.sqrt(2)*np.array([1, -1]),
@@ -109,22 +109,22 @@ psk = {
     }
 
 qam16 = {
-        (0, 0, 0, 0): 1.0/np.sqrt(3)*np.array([1, 1]),
-        (0, 0, 0, 1): 1.0/np.sqrt(3)*np.array([2, 1]),
-        (0, 0, 1, 0): 1.0/np.sqrt(3)*np.array([1, 2]),
-        (0, 0, 1, 1): 1.0/np.sqrt(3)*np.array([2, 2]),
-        (0, 1, 0, 0): 1.0/np.sqrt(3)*np.array([1, -1]),
-        (0, 1, 0, 1): 1.0/np.sqrt(3)*np.array([1, -2]),
-        (0, 1, 1, 0): 1.0/np.sqrt(3)*np.array([2, -1]),
-        (0, 1, 1, 1): 1.0/np.sqrt(3)*np.array([2, -2]),
-        (1, 0, 0, 0): 1.0/np.sqrt(3)*np.array([-1, 1]),
-        (1, 0, 0, 1): 1.0/np.sqrt(3)*np.array([-1, 2]),
-        (1, 0, 1, 0): 1.0/np.sqrt(3)*np.array([-2, 1]),
-        (1, 0, 1, 1): 1.0/np.sqrt(3)*np.array([-2, 2]),
-        (1, 1, 0, 0): 1.0/np.sqrt(3)*np.array([-1, -1]),
-        (1, 1, 0, 1): 1.0/np.sqrt(3)*np.array([-2, -1]),
-        (1, 1, 1, 0): 1.0/np.sqrt(3)*np.array([-1, -2]),
-        (1, 1, 1, 1): 1.0/np.sqrt(3)*np.array([-2, -2])
+        (0, 0, 0, 0): np.array([-3, 3])/(3.0*np.sqrt(2)),
+        (0, 0, 0, 1): np.array([-3, 1])/(3.0*np.sqrt(2)),
+        (0, 0, 1, 0): np.array([-3, -3])/(3.0*np.sqrt(2)),
+        (0, 0, 1, 1): np.array([-3, -1])/(3.0*np.sqrt(2)),
+        (0, 1, 0, 0): np.array([-1, 3])/(3.0*np.sqrt(2)),
+        (0, 1, 0, 1): np.array([-1, 1])/(3.0*np.sqrt(2)),
+        (0, 1, 1, 0): np.array([-1, -3])/(3.0*np.sqrt(2)),
+        (0, 1, 1, 1): np.array([-1, -1])/(3.0*np.sqrt(2)),
+        (1, 0, 0, 0): np.array([3, 3])/(3.0*np.sqrt(2)),
+        (1, 0, 0, 1): np.array([3, 1])/(3.0*np.sqrt(2)),
+        (1, 0, 1, 0): np.array([3, -3])/(3.0*np.sqrt(2)),
+        (1, 0, 1, 1): np.array([3, -1])/(3.0*np.sqrt(2)),
+        (1, 1, 0, 0): np.array([1, 3])/(3.0*np.sqrt(2)),
+        (1, 1, 0, 1): np.array([1, 1])/(3.0*np.sqrt(2)),
+        (1, 1, 1, 0): np.array([1, -3])/(3.0*np.sqrt(2)),
+        (1, 1, 1, 1): np.array([1, -1])/(3.0*np.sqrt(2))
     }
 
 
@@ -148,7 +148,7 @@ def polar_to_cartesian(r, theta):
 
 def get_mod_vars(n_bits):
     if n_bits == 2:
-        return psk, psk_legend_map, inv_psk_legend_map
+        return qpsk, qpsk_legend_map, inv_qpsk_legend_map
 
     if n_bits == 4:
         return qam16, qam16_legend_map, inv_qam16_legend_map
