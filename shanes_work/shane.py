@@ -24,15 +24,16 @@ def normc_initializer(std=1.0):
     return _initializer
 
 class NeuralTransmitter(object):
-    def __init__(self, n_bits=2, num_hidden_per_layer=[64, 32], steps_per_episode=32, stepsize=5e-3, polar=False):
+    def __init__(self, n_bits=2, num_hidden_per_layer=[64, 32], steps_per_episode=32, stepsize=5e-3, action_dim=2, desired_kl=1e-1):
 
         self.n_hidden_layers = len(num_hidden_per_layer)
         self.num_hidden_per_layer = num_hidden_per_layer
+        self.desired_kl = desired_kl
 
         self.n_bits = n_bits
+        self.action_dim = action_dim
         self.steps_per_episode = steps_per_episode
         self.stepsize = stepsize
-        self.polar = polar
 
         self.step = 0 # current step
 
@@ -41,9 +42,13 @@ class NeuralTransmitter(object):
 
         # Network
         self.sy_x = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.sy_actions = tf.placeholder(tf.float32, [None, 2]) # x actions for gradient calculation
+        self.sy_actions = tf.placeholder(tf.float32, [None, self.action_dim]) # x actions for gradient calculation
         self.sy_adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
         self.sy_stepsize = tf.placeholder(shape=[], dtype=tf.float32) # stepsize for gradient step
+        self.sy_batch_size = tf.placeholder(tf.int32, [])
+
+        self.sy_old_action_means = tf.placeholder(tf.float32, [None, self.action_dim])
+        self.sy_old_logstds = tf.placeholder(tf.float32, [None, self.action_dim])
 
         # Hidden Layers
         self.layers = [self.sy_x]
@@ -60,59 +65,28 @@ class NeuralTransmitter(object):
         self.h_last = self.layers[-1]
 
         # Outputs
-        if self.polar:
-            self.r_theta_mean = tf.squeeze(tf.contrib.layers.fully_connected (
-                    inputs = self.h_last,
-                    num_outputs = 2,
-                    activation_fn = None,
-                    weights_initializer = normc_initializer(1.0),
-                    biases_initializer = tf.constant_initializer(0.0)
-                ))
-            ipy.embed()
-            self.r_logstd = tf.Variable(-1.)
-            self.theta_logstd = tf.Variable(0.)
-            self.r_distr = tf.contrib.distributions.Normal(self.r_mean, tf.exp(self.r_logstd))
-            self.theta_distr = tf.contrib.distributions.Normal(self.theta_mean, tf.exp(self.theta_logstd))
-            self.sy_r_sample = self.r_distr.sample()
-            self.sy_theta_sample = self.theta_distr.sample()
-            self.x_mean = self.r_mean * tf.cos(self.theta_mean)
-            self.y_mean = self.r_mean * tf.sin(self.theta_mean)
-            self.sy_x_sample = self.sy_r_sample * tf.cos(self.sy_theta_sample)
-            self.sy_y_sample = self.sy_r_sample * tf.sin(self.sy_theta_sample)
-        else:
-            self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                    inputs = self.h_last,
-                    num_outputs = 1,
-                    activation_fn = None,
-                    weights_initializer = normc_initializer(.2),
-                    biases_initializer = tf.constant_initializer(0.0)
-                ))
-            self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                    inputs = self.h_last,
-                    num_outputs = 1,
-                    activation_fn = None,
-                    weights_initializer = normc_initializer(.2),
-                    biases_initializer = tf.constant_initializer(0.0)
-                ))
-            self.x_logstd = tf.Variable(-1.)
-            self.y_logstd = tf.Variable(-1.)
-            self.x_distr = tf.contrib.distributions.Normal(self.x_mean, tf.exp(self.x_logstd))
-            self.y_distr = tf.contrib.distributions.Normal(self.y_mean, tf.exp(self.y_logstd))
-            self.sy_x_sample = self.x_distr.sample()
-            self.sy_y_sample = self.y_distr.sample()
+        self.action_means = tf.contrib.layers.fully_connected(
+                inputs = self.h_last,
+                num_outputs = self.action_dim,
+                activation_fn = None,
+                weights_initializer = normc_initializer(.2),
+                biases_initializer = tf.constant_initializer(0.0)
+        )
+        self.x_y_logstds = tf.Variable(tf.ones(shape=self.action_dim))
+        self.x_y_logstds = tf.reshape(self.x_y_logstds, [-1, 1])
+        self.x_y_logstds = tf.tile(self.x_y_logstds, [1, self.sy_batch_size])
+        self.x_y_logstds = tf.transpose(self.x_y_logstds)
+
+        self.x_y_distr = tf.contrib.distributions.MultivariateNormalDiag(self.action_means, tf.exp(self.x_y_logstds))
+        self.action_sample = self.x_y_distr.sample()
+
+        self.x_y_old_distr = tf.contrib.distributions.MultivariateNormalDiag(self.sy_old_action_means, tf.exp(self.sy_old_logstds))
+
+        self.kl = tf.reduce_mean(tf.contrib.distributions.kl(self.x_y_distr, self.x_y_old_distr))
 
         # Compute log-probabilities for gradient estimation
-        if self.polar:
-            self.r_logprob = self.r_distr.log_prob(tf.sqrt(self.sy_x_actions**2 + self.sy_y_actions**2))
-            self.theta_logprob = self.theta_distr.log_prob(tf.atan(self.sy_y_actions / self.sy_x_actions))
-            self.sy_surr = - tf.reduce_mean(self.sy_adv * (self.theta_logprob + self.r_logprob))
-
-        else:
-            self.x_logprob = self.x_distr.log_prob(self.sy_x_actions)
-            self.y_logprob = self.y_distr.log_prob(self.sy_y_actions)
-            self.sy_surr = - tf.reduce_mean(self.sy_adv * (self.x_logprob + self.y_logprob))
-            ipy.embed()
-            self.old_x_distr = tf.contrib.distributions.Normal(tf.Variable([self.old_x_means, self.old_y_means], tf.Variable([tf.exp(self.old_x_logstd), tf.exp(self.old_y_logstd)])))
+        self.x_y_logprob = self.x_y_distr.log_prob(self.sy_actions)
+        self.sy_surr = - tf.reduce_mean(self.sy_adv * self.x_y_logprob)
 
         self.update_op = tf.train.AdamOptimizer(self.sy_stepsize).minimize(self.sy_surr)
 
@@ -121,28 +95,41 @@ class NeuralTransmitter(object):
 
     def reset_accum(self):
         self.xs_accum = np.empty((0, self.n_bits))
-        self.x_accum = np.empty(0)
-        self.y_accum = np.empty(0)
+        self.actions_accum = np.empty((0, self.action_dim))
         self.adv_accum = np.empty(0)
 
     def policy_update(self):
         print ("updating policy")
-        if self.polar:
-            theta_logstd, r_logstd = self.sess.run([self.theta_logstd, self.r_logstd])
-            print ("theta_std:", np.exp(theta_logstd))
-            print ("r_std:", np.exp(r_logstd))
-        else:
-            x_logstd, y_logstd = self.sess.run([self.x_logstd, self.y_logstd])
-            print ("x_std:", np.exp(x_logstd))
-            print ("y_std:", np.exp(y_logstd))
 
-        self.sess.run([self.update_op], feed_dict={
+        old_action_means, old_logstds = self.sess.run([self.action_means, self.x_y_logstds], feed_dict={
                 self.sy_x: self.xs_accum,
-                self.sy_x_actions: self.x_accum,
-                self.sy_y_actions: self.y_accum,
+                self.sy_batch_size: self.actions_accum.shape[0]
+        })
+
+        _ = self.sess.run([self.update_op], feed_dict={
+                self.sy_x: self.xs_accum,
+                self.sy_actions: self.actions_accum,
                 self.sy_adv: self.adv_accum,
-                self.sy_stepsize: self.stepsize
-            })
+                self.sy_stepsize: self.stepsize,
+                self.sy_batch_size: self.actions_accum.shape[0]
+        })
+
+        kl = self.sess.run([self.kl], feed_dict={
+                self.sy_x: self.xs_accum,
+                self.sy_batch_size: self.actions_accum.shape[0],
+                self.sy_old_action_means: old_action_means,
+                self.sy_old_logstds: old_logstds
+        })[0]
+
+        print ('KL: %.6f' % kl)
+        if kl > self.desired_kl * 2:
+            self.stepsize /= 1.5
+            print ('stepsize -> %.6f' % self.stepsize)
+        elif kl < self.desired_kl / 2:
+            self.stepsize *= 1.5
+            print ('stepsize -> %.6f' % self.stepsize)
+        else:
+            print ('stepsize OK')
 
         self.reset_accum()
 
@@ -154,21 +141,23 @@ class NeuralTransmitter(object):
 
         # run policy
         if evaluate:
-            x, y = self.sess.run([self.x_mean, self.y_mean], feed_dict={
-                    self.sy_x: x_input
-            })
+            action = self.sess.run([self.action_means], feed_dict={
+                    self.sy_x: x_input,
+                    self.sy_batch_size: 1
+            })[0]
         else:
-            x, y = self.sess.run([self.sy_x_sample, self.sy_y_sample], feed_dict={
-                    self.sy_x: x_input
-                })
-            self.xs_accum = np.r_[self.xs_accum, x_input]
-            self.x_accum = np.r_[self.x_accum, np.array(x)[None]]
-            self.y_accum = np.r_[self.y_accum, np.array(y)[None]]
+            action = self.sess.run([self.action_sample], feed_dict={
+                    self.sy_x: x_input,
+                    self.sy_batch_size: 1
+            })[0]
 
-        return np.array([x, y])
+            self.xs_accum = np.r_[self.xs_accum, x_input]
+            self.actions_accum = np.r_[self.actions_accum, action]
+
+        return action[0]
 
     def receive_reward(self, rew):
-        self.adv_accum = np.r_[self.adv_accum, rew + 2.]
+        self.adv_accum = np.r_[self.adv_accum, rew]
 
         # If episode over, update policy and reset
         if self.step >= self.steps_per_episode:
@@ -212,7 +201,7 @@ def rx_decode(rx_inp, decoding_map):
             dist = d
     return rx_out
 
-def run_simulation(n_bits, l, seed, steps_per_episode, polar, stepsize, num_hidden_per_layer, decoding_map, sigma):
+def run_simulation(n_bits, l, seed, steps_per_episode, stepsize, num_hidden_per_layer, decoding_map, sigma, desired_kl):
 
     # set seed
     tf.set_random_seed(seed)
@@ -221,7 +210,8 @@ def run_simulation(n_bits, l, seed, steps_per_episode, polar, stepsize, num_hidd
     # instantiate environment
     env = Environment(n_bits=n_bits, l=l, sigma=sigma)
     # instantiate transmitter
-    nt = NeuralTransmitter(n_bits=n_bits, steps_per_episode=steps_per_episode, polar=polar, stepsize=stepsize, num_hidden_per_layer=num_hidden_per_layer)
+    nt = NeuralTransmitter(n_bits=n_bits, steps_per_episode=steps_per_episode, stepsize=stepsize, num_hidden_per_layer=num_hidden_per_layer, desired_kl=desired_kl
+        )
 
     # training and evaluation
     for i in range(1000):
@@ -291,12 +281,10 @@ if __name__ == '__main__':
         (1, 1, 1, 1): 0.5/np.sqrt(2)*np.array([-3, -3])
     }
 
-    general_params = dict()
+    general_params = dict(stepsize=1e-3, desired_kl=3e-2, steps_per_episode=512)
     params = [
-        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, steps_per_episode=1000, polar=False, stepsize=1e-3, num_hidden_per_layer=[64, 10], **general_params),
-        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, steps_per_episode=1000, polar=True, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params),
-        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, steps_per_episode=1000, polar=False, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params),
-        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2, steps_per_episode=1000, polar=True, num_hidden_per_layer=[64, 10], stepsize=1e-3, **general_params)
+        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2,num_hidden_per_layer=[64, 20], **general_params),
+        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, num_hidden_per_layer=[64, 20], **general_params),
     ]
 
     for param in params:
