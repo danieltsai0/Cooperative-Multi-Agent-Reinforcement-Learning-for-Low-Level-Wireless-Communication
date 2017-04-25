@@ -182,9 +182,9 @@ class NeuralTransmitter(object):
 
         for bs in bitstrings:
             x,y = self.evaluate(np.array(bs)[None])
-            ax.scatter(x, y, label=str(bs), color='purple', marker="d")
-            x, y = x*0.5+0.5, y*0.5+0.5
-            ax.annotate(str(bs), (x, y), size=10)
+            label = (np.array(bs)+1)/2
+            ax.scatter(x, y, label=str(label), color='purple', marker="d")
+            ax.annotate(str(label), (x, y), size=10)
         ax.axvline(0, color='grey')
         ax.axhline(0, color='grey')
         #ax.grid()

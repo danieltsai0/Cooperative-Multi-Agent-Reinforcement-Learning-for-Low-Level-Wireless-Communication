@@ -14,7 +14,7 @@ class System():
     def __init__(self, n_bits, groundtruth):
         # General args
         preamble = generate_preamble(2**12,n_bits) 
-        size_of_episode = 2**9
+        size_of_episode = 2**7
         # Transmitter args
         n_hidden = 20
         stepsize = 1e-2
@@ -59,7 +59,7 @@ class System():
         p_g_g_b_one = self.actor_one.receive_preamble_g(self.channel.add_noise(p_m_two), self.channel.add_noise(p_g_m_two))
         self.actor_one.transmitter_update(p_g_g_b_one)
 
-        if (i%5==0):
+        if (i%10==0):
             self.actor_one.visualize(i)
 
     """
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     # Params
     n_bits = 2
     groundtruth = qpsk 
-    num_iterations = 2**9
+    num_iterations = 2**10
 
     # Run
     sys = System(n_bits, groundtruth)
