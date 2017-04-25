@@ -14,6 +14,7 @@ import IPython as ipy
 import itertools
 import matplotlib.pyplot as plt
 import time
+from scipy.stats import mode
 
 # normalized constant initializer for NN weights from cs 294-112 code
 def normc_initializer(std=1.0):
@@ -72,7 +73,7 @@ class NeuralTransmitter(object):
                 weights_initializer = normc_initializer(.2),
                 biases_initializer = tf.constant_initializer(0.0)
         )
-        self.x_y_logstds = tf.Variable(tf.ones(shape=self.action_dim))
+        self.x_y_logstds = -1.*tf.Variable(tf.ones(shape=self.action_dim))
         self.x_y_logstds = tf.reshape(self.x_y_logstds, [-1, 1])
         self.x_y_logstds = tf.tile(self.x_y_logstds, [1, self.sy_batch_size])
         self.x_y_logstds = tf.transpose(self.x_y_logstds)
@@ -88,7 +89,19 @@ class NeuralTransmitter(object):
         self.x_y_logprob = self.x_y_distr.log_prob(self.sy_actions)
         self.sy_surr = - tf.reduce_mean(self.sy_adv * self.x_y_logprob)
 
-        self.update_op = tf.train.AdamOptimizer(self.sy_stepsize).minimize(self.sy_surr)
+        self.optimizer = tf.train.AdamOptimizer(self.sy_stepsize)
+        self.update_op = self.optimizer.minimize(self.sy_surr)
+
+        # my attempt at calculating a baseline
+        # self.opt_fake = tf.train.GradientDescentOptimizer(learning_rate=0.1)
+        # self.gradients = self.opt_fake.compute_gradients(self.x_y_logprob)
+
+        # self.grad_norm = tf.Variable(0.0)
+        # for grad in self.gradients:
+        #     self.grad_norm += tf.reduce_sum(tf.square(grad))
+
+        # self.baseline = tf.reduce_mean()
+        # ipy.embed()
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
@@ -134,27 +147,29 @@ class NeuralTransmitter(object):
         self.reset_accum()
 
     def transmit(self, x_input, evaluate=False):
-        self.step += 1
 
         # convert input into proper format (e.g. x=[1 0] --> [1 -1])
         x_input = 2 * (x_input - .5)
+
+        batch_size = x_input.shape[0]
 
         # run policy
         if evaluate:
             action = self.sess.run([self.action_means], feed_dict={
                     self.sy_x: x_input,
-                    self.sy_batch_size: 1
+                    self.sy_batch_size: batch_size
             })[0]
         else:
             action = self.sess.run([self.action_sample], feed_dict={
                     self.sy_x: x_input,
-                    self.sy_batch_size: 1
+                    self.sy_batch_size: batch_size
             })[0]
 
             self.xs_accum = np.r_[self.xs_accum, x_input]
             self.actions_accum = np.r_[self.actions_accum, action]
+            self.step += batch_size
 
-        return action[0]
+        return action
 
     def receive_reward(self, rew):
         self.adv_accum = np.r_[self.adv_accum, rew]
@@ -164,7 +179,7 @@ class NeuralTransmitter(object):
             self.policy_update()
             self.step = 0
 
-    def constellation(self, iteration=0, groundtruth=None):
+    def constellation(self, iteration=0, groundtruth=None, gt_labels=True):
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
         """
@@ -174,7 +189,8 @@ class NeuralTransmitter(object):
         size = 5
 
         for bs in bitstrings:
-            x,y = self.transmit(np.array(bs)[None], evaluate=True)
+            actions = self.transmit(np.array(bs)[None], evaluate=True)
+            x, y = actions[0]
             plt.scatter(x, y, label=str(bs))
             plt.annotate(str(bs), (x, y), size=size)
         plt.axvline(0)
@@ -186,10 +202,49 @@ class NeuralTransmitter(object):
             for k in groundtruth.keys():
                 x_gt, y_gt = groundtruth[k]
                 plt.scatter(x_gt, y_gt, s=size, color='purple')
-                plt.annotate(''.join([str(b) for b in k]), (x_gt, y_gt), size=size)
+                if gt_labels:
+                    plt.annotate(''.join([str(b) for b in k]), (x_gt, y_gt), size=size)
 
         plt.savefig('figures/%d.png' % iteration)
         plt.close()
+
+class KNNReceiver(object):
+    def __init__(self, n_bits=2, k=5):
+        self.n_bits = n_bits
+        self.k = k
+
+    def decode(self, tx_out, correct_labels):
+        # tx_out is Nx2 array of transmission
+        # correct_lables is a Nx{n_bits} array of transmitted strings
+        outputs = np.empty((0, self.n_bits))
+        for i in range(tx_out.shape[0]):
+            trans = tx_out[i, :]
+            correct_labels_copy = correct_labels[:]
+            tx_out_copy = np.delete(tx_out, i, axis=0)
+            correct_labels_copy = np.delete(correct_labels, i, axis=0)
+            dists = np.linalg.norm(trans - tx_out_copy, axis=1)
+            indices_sorted = np.argsort(dists)
+            k_top = correct_labels_copy[indices_sorted, :][:self.k, :]
+            outputs = np.r_[outputs, mode(k_top)[0]]
+
+        return outputs
+
+def run_simulation_distributed(n_bits, l, seed, steps_per_episode, stepsize, num_hidden_per_layer, decoding_map, sigma, desired_kl):
+    env = Environment(n_bits=n_bits, l=l, sigma=sigma)
+    nt = NeuralTransmitter(n_bits=n_bits, steps_per_episode=steps_per_episode, stepsize=stepsize, num_hidden_per_layer=num_hidden_per_layer, desired_kl=desired_kl
+            )
+    knnr = KNNReceiver(n_bits=n_bits)
+
+    for i in range(500):
+        inp = np.array([env.get_input_transmitter() for _ in range(steps_per_episode)])
+        tx_out = nt.transmit(inp)
+        rx_out = knnr.decode(tx_out, inp)
+        rew = - np.linalg.norm(rx_out - inp, ord=1, axis=1) - l * np.linalg.norm(tx_out, axis=1)**2
+        nt.receive_reward(rew)
+        print ("rew_mean:", np.mean(rew))
+
+        if i % 1 == 0:
+            nt.constellation(iteration=i, groundtruth=decoding_map, gt_labels=False)
 
 # Given a decoding map, return the closest bitstring
 def rx_decode(rx_inp, decoding_map):
@@ -202,7 +257,6 @@ def rx_decode(rx_inp, decoding_map):
     return rx_out
 
 def run_simulation(n_bits, l, seed, steps_per_episode, stepsize, num_hidden_per_layer, decoding_map, sigma, desired_kl):
-
     # set seed
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -214,14 +268,14 @@ def run_simulation(n_bits, l, seed, steps_per_episode, stepsize, num_hidden_per_
         )
 
     # training and evaluation
-    for i in range(1000):
+    for i in range(500):
         rew_per_ep = 0.0
         start = time.time()
         for _ in range(steps_per_episode):
             # tx
             tx_inp = env.get_input_transmitter()
             tx_out = nt.transmit(tx_inp[None])
-            env.output_transmitter(tx_out)
+            env.output_transmitter(tx_out[0])
 
             # rx
             rx_inp = env.get_input_receiver()
@@ -250,7 +304,7 @@ def run_simulation(n_bits, l, seed, steps_per_episode, stepsize, num_hidden_per_
         print ("bits incorrect / %d:" % (n_bits*2**(n_bits)), rew)
         print ("wall clock time: %.4f ms" % ((end - start)*1000))
 
-        if i % 10 == 0:
+        if i % 1 == 0:
             nt.constellation(iteration=i, groundtruth=decoding_map)
 
 if __name__ == '__main__':
@@ -281,12 +335,13 @@ if __name__ == '__main__':
         (1, 1, 1, 1): 0.5/np.sqrt(2)*np.array([-3, -3])
     }
 
-    general_params = dict(stepsize=1e-3, desired_kl=3e-2, steps_per_episode=512)
+    general_params = dict(stepsize=1e-3, desired_kl=2e-3, steps_per_episode=512)
     params = [
-        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2,num_hidden_per_layer=[64, 20], **general_params),
         dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, num_hidden_per_layer=[64, 20], **general_params),
+        dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2,num_hidden_per_layer=[64, 20], **general_params),
     ]
 
     for param in params:
-        run_simulation(**param)
+        run_simulation_distributed(**param)
+        # run_simulation(**param)
 
