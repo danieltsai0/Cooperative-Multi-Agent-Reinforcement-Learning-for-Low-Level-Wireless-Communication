@@ -337,8 +337,8 @@ if __name__ == '__main__':
 
     general_params = dict(stepsize=1e-3, desired_kl=2e-3, steps_per_episode=512)
     params = [
-        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, num_hidden_per_layer=[64, 20], **general_params),
         dict(seed=0, n_bits=4, decoding_map=qam16, l=.1, sigma=.2,num_hidden_per_layer=[64, 20], **general_params),
+        dict(seed=0, n_bits=2, decoding_map=psk, l=.1, sigma=.2, num_hidden_per_layer=[64, 20], **general_params),
     ]
 
     for param in params:
