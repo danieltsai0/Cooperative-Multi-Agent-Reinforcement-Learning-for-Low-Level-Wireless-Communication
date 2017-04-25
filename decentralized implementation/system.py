@@ -18,7 +18,7 @@ class System():
         # Transmitter args
         n_hidden = 20
         stepsize = 1e-2
-        l = .5
+        l = .1
         # Receiver args
         k = 3
 
@@ -80,9 +80,9 @@ class System():
             self.advanced_trans_sequence(i)
             self.swap_actors()
             self.increment_actors_pi()
-            print("\n><<><><>><><><><><<><><>><><><><><<><><>><><><><><<><><>><><><><><<><><>><><><><\n")
+            print("\n><<><><>><><><><><<>\n")
             print("done with iteration:",i)
-            print("\n><<><><>><><><><><<><><>><><><><><<><><>><><><><><<><><>><><><><><<><><>><><><><\n")
+            print("\n><<><><>><><><><><<>\n")
 
 
 

@@ -35,11 +35,12 @@ def mode_rows(a):
 
 
 """
-Used for interpreting preamble signal.
+Used for demodulating preamble signal.
+
 Inputs:
-    data:    numpy array of complex numbers
+    data:    numpy array of complex numbers to be demodulated
              shape: (?,)
-    labels:  numpy array of bitstrings
+    labels:  numpy array of bitstrings that correspond to each row in (data)
              shape: (?, num_bits)
     func:    function to apply to knn labels
 
@@ -62,7 +63,22 @@ def knn_preamble(k, data, labels, func):
 
 
 """
-Used for interpreting premable signal.
+Used for interpreting preamble guess signal.
+
+Inputs:
+    data:    numpy array of complex numbers to build map
+             shape: (?,)
+    labels:  numpy array of bitstrings that correspond to each row in (data)
+             shape: (?, num_bits)
+    signal:  numpy array of complex numbers to be demodulated
+             shape: (?,)
+    func:    function to apply to knn labels
+
+Outputs:
+    output: numpy array of bitstring guesses 
+             for each input data point based 
+             on k nearest neighbors
+             shape: (?, num_bits)
 """
 def knn_reward(k, data, labels, signal, func):
     output = np.empty((0, labels.shape[1]))
@@ -88,21 +104,30 @@ class KnnReceiver():
         self.k = k
         self.func = mode_rows
 
-    # Receive signal from transmitter
-    # Generates guesses, which represents the knn guess for each signal
-    # Can change reward to be % of correct labels in k nearest neighbors
+    """
+    Internal function for setting modulated preamble and bit format premable for demodulation use.
+    """
     def receive(self, preamble_mod, preamble_bit):
         self.preamble_mod = preamble_mod
         # print("preamble_mod.shape:",self.preamble_mod.shape)
         self.preamble_bit = preamble_bit
         # print("preamble_bit.shape:",preamble_bit.shape)        
 
+    """
+    Demodulates modulated preamble signal using Knn
+    """
     def generate_guess(self):
         self.output = knn_preamble(self.k, self.preamble_mod, self.preamble_bit, self.func)
         return self.output
 
-    def generate_demod(self, reward_mod):
+    """
+    Demodulates modulated preamble guess signal using Knn
+
+    Inputs:
+        preamble_g_mod: modulated preamble guess
+    """
+    def generate_demod(self, preamble_g_mod):
         # print("reward_mod.shape:",reward_mod.shape)
-        self.reward_mod = reward_mod
-        self.output = knn_reward(self.k, self.preamble_mod, self.preamble_bit, self.reward_mod, self.func)
+        self.preamble_g_mod = preamble_g_mod
+        self.output = knn_reward(self.k, self.preamble_mod, self.preamble_bit, self.preamble_g_mod, self.func)
         return self.output

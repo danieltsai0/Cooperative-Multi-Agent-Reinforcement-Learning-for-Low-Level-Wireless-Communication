@@ -3,7 +3,9 @@
 #  Basic Learning Transmitter
 #  Shane Barratt <stbarratt@gmail.com>
 #
-#  Simulates a learning transmitter with a fixed receiver.
+#  Network takes in a n_bit long sequence of bits and outputs 
+#  a continuous distribution over x and y, which denote the
+#  two axes in the complex plane.
 #
 ############################################################ 
 
@@ -30,7 +32,7 @@ class NeuralTransmitter(object):
         self.n_bits = n_bits
         self.n_hidden = n_hidden
         self.stepsize = stepsize
-        self.l = l
+        self.l = l # loss rate for power 
         # Misc. parameters
         self.groundtruth = groundtruth
         self.im_dir = 'figures/'+str(uid)+'/'
@@ -53,16 +55,24 @@ class NeuralTransmitter(object):
             biases_initializer = tf.constant_initializer(.1)
         )
 
+        self.h2 = tf.contrib.layers.fully_connected(
+            inputs = self.h1,
+            num_outputs = self.n_hidden,
+            activation_fn = tf.nn.relu, # relu activation for hidden layer
+            weights_initializer = normc_initializer(1.0),
+            biases_initializer = tf.constant_initializer(.1)
+        )
+
         # Outputs
         self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected (
-                inputs = self.h1,
+                inputs = self.h2,
                 num_outputs = 1,
                 activation_fn = None,
                 weights_initializer = normc_initializer(1.0),
                 biases_initializer = tf.constant_initializer(1.5)
             ))
         self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                inputs = self.h1,
+                inputs = self.h2,
                 num_outputs = 1,
                 activation_fn = None, 
                 weights_initializer = normc_initializer(1.0),
@@ -90,7 +100,10 @@ class NeuralTransmitter(object):
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-
+    """
+    Updates the transmitter based on the input, x and y SAMPLE outputs
+    and the advantage (which is just the loss right now).
+    """
     def policy_update(self):
 
         self.sess.run([self.update_op], feed_dict={
@@ -101,14 +114,31 @@ class NeuralTransmitter(object):
                 # self.stepsize: self.stepsize
             })
 
+    """
+    Wrapper function for policy update. Receives the bit format of the guess of the 
+    preamble guess and computes a loss over it.
+
+    Inputs: 
+        preamble_g_g_bit: bit format of the guess of the preamble guess - taken from
+                          this Actor's receiver unit
+    """
     # Receive reward signal from other agent. Should be of same length as actions
-    def update(self, reward_bit):
-        self.adv_accum = - self.ridge_loss(reward_bit)
+    def update(self, preamble_g_g_bit):
+        self.adv_accum = - self.ridge_loss(preamble_g_g_bit)
         # print("adv_accum.shape:",self.adv_accum.shape)  
         print("avg_reward:",np.average(self.adv_accum))  
         self.policy_update()
 
-    # Transmit a signal
+    
+    """
+    Transmits the input signal as a sequence of complex numbers.
+
+    Inputs: 
+        signal: bit format signal
+
+    Outputs: 
+        modulated output: complex signal to be transmitted
+    """
     def transmit(self, signal):
         # get chunk of data to transmit
         self.trans_input = signal
@@ -126,6 +156,12 @@ class NeuralTransmitter(object):
         # print("trans_output.shape:",self.trans_output.shape)
         return self.trans_output
 
+    """
+    Evaluates the means of the distribution for plotting purposes.
+
+    Inputs: 
+        data: bitwise array to be modulated
+    """
     def evaluate(self, data):
         # run policy
         x, y = self.sess.run([self.x_mean, self.y_mean], feed_dict={
@@ -133,7 +169,12 @@ class NeuralTransmitter(object):
             })     
         return np.array([x,y]).T
 
-    # Visualize the decisions of the network
+    """
+    Visualize the centroids of the distributions of the network.
+
+    Inputs: 
+        iteration: used for plotting purposes
+    """
     def visualize(self, iteration):
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
@@ -159,10 +200,18 @@ class NeuralTransmitter(object):
         plt.savefig(self.im_dir % iteration)
         plt.close()
 
+
+
+    ##################
+    # Loss functions #
+    ##################
+
     """
-    Loss functions
+    L1 loss
+
+    Inputs:
+        signal: bit format signal to be compared to the original input
     """
-    # Input signal is the labels that the receiver received
     def lasso_loss(self, signal):
         # print("trans_output.shape:",self.trans_output.shape)
         # print("trans_output_sum.shape:",(self.l*np.sum(self.trans_output**2,axis=1)).shape)
@@ -171,5 +220,11 @@ class NeuralTransmitter(object):
         # print("linalg.shape:",np.linalg.norm(self.trans_input - signal, ord=1,axis=1).shape)
         return np.linalg.norm(self.trans_input - signal, ord=1, axis=1) + self.l*np.sum(self.trans_output**2,axis=1)
 
+    """
+    L2 loss
+
+    Inputs:
+        signal: bit format signal to be compared to the original input
+    """
     def ridge_loss(self, signal):
         return np.linalg.norm(self.trans_input - signal, axis=1) + self.l*np.sum(self.trans_output**2,axis=1)
