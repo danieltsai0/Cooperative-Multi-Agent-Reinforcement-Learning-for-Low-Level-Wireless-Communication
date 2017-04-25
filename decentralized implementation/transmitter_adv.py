@@ -55,24 +55,16 @@ class NeuralTransmitter(object):
             biases_initializer = tf.constant_initializer(.1)
         )
 
-        self.h2 = tf.contrib.layers.fully_connected(
-            inputs = self.h1,
-            num_outputs = self.n_hidden,
-            activation_fn = tf.nn.relu, # relu activation for hidden layer
-            weights_initializer = normc_initializer(1.0),
-            biases_initializer = tf.constant_initializer(.1)
-        )
-
         # Outputs
         self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected (
-                inputs = self.h2,
+                inputs = self.h1,
                 num_outputs = 1,
                 activation_fn = None,
                 weights_initializer = normc_initializer(1.0),
                 biases_initializer = tf.constant_initializer(1.5)
             ))
         self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                inputs = self.h2,
+                inputs = self.h1,
                 num_outputs = 1,
                 activation_fn = None, 
                 weights_initializer = normc_initializer(1.0),
