@@ -25,17 +25,19 @@ SEQ_LENGTH = 2*OSF # sequence length
 TOTAL_NUMBER_SEQUENCES = 16*15*14 # total number of sequences in datapool
 BATCH_SIZE = 256 
 TEST_SIZE = 1000 # number of symbols for testing
-HIDDEN_DIM = 40 
+HIDDEN_DIM = 80 
 NUM_LAYERS = 2 # number of layers in the LSTM
 OUTPUT_DIM = 2 
 INPUT_DIM = 4 # 2: real & imag, 3: add magnitude, 4: add phase
+MODEL = "lstm" # "nn" or "lstm"
 
 assert INPUT_DIM>=2 #  
 
-ITERATIONS = 3000
+ITERATIONS = 10000
 LEARNING_RATE = 1e-6
-PRINTEVERY = 50 # how often the training error is reported
+PRINTEVERY = ITERATIONS/25 # how often the training error is reported
 PLOT = True # plot at every report
+RRC_PLOT = False # plot RRC Filter
 DRAW = False # export images
 NUM_EYE = 100 # number of sequences for eye diagramm
 
@@ -50,24 +52,51 @@ sy_input = tf.placeholder(tf.float32, shape=[None, SEQ_LENGTH, INPUT_DIM])
 sy_target = tf.placeholder(tf.float32, shape= [None, 2])
 sy_batchsize = tf.shape(sy_input)[0]
 
-sy_lstm = tf.contrib.rnn.LSTMCell(HIDDEN_DIM)
-sy_stacked_lstm = tf.contrib.rnn.MultiRNNCell([sy_lstm]*NUM_LAYERS)
-sy_initial_state = sy_state = sy_stacked_lstm.zero_state(sy_batchsize, dtype=tf.float32)
+if (MODEL == "lstm"):
 
-# Version 1: don't unroll LSTM
-sy_outputs, sy_state = tf.nn.dynamic_rnn(sy_stacked_lstm, 
-                                         sy_input, 
-                                         initial_state=sy_initial_state, 
-                                         time_major=False)
+    sy_lstm = tf.contrib.rnn.LSTMCell(HIDDEN_DIM)
+    sy_stacked_lstm = tf.contrib.rnn.MultiRNNCell([sy_lstm]*NUM_LAYERS)
+    sy_initial_state = sy_state = sy_stacked_lstm.zero_state(sy_batchsize, dtype=tf.float32)
 
-# we are only interested in the last output
-sy_last = tf.unstack(sy_outputs, axis=1)[-1] 
+    # Version 1: don't unroll LSTM
+    sy_outputs, sy_state = tf.nn.dynamic_rnn(sy_stacked_lstm, 
+                                             sy_input, 
+                                             initial_state=sy_initial_state, 
+                                             time_major=False)
 
-# transform outputs of LSTM to output target (softmax probabilities)
-sy_w = tf.Variable(tf.truncated_normal([HIDDEN_DIM, OUTPUT_DIM]), name="output_weight")
-sy_b = tf.Variable(tf.constant(0.0, shape=[OUTPUT_DIM]), name="output_bias")
-sy_output = tf.matmul(sy_last, sy_w) + sy_b
+    # we are only interested in the last output
+    sy_last = tf.unstack(sy_outputs, axis=1)[-1] 
 
+    # transform outputs of LSTM to output target (softmax probabilities)
+    sy_w = tf.Variable(tf.truncated_normal([HIDDEN_DIM, OUTPUT_DIM]), name="output_weight")
+    sy_b = tf.Variable(tf.constant(0.0, shape=[OUTPUT_DIM]), name="output_bias")
+    sy_output = tf.matmul(sy_last, sy_w) + sy_b
+
+elif (MODEL == "nn"):
+  
+    print sy_input.get_shape() 
+    conv1 = tf.nn.conv1d(sy_input, 
+                         filters = tf.truncated_normal(stddev=0.1, shape=[3, 4, 8]),
+                         stride=1, 
+                         padding='VALID')
+
+    print conv1.get_shape() 
+    out1 = tf.nn.relu(conv1)
+
+    conv2 = tf.nn.conv1d(sy_input,
+                         filters = tf.truncated_normal(stddev=0.1, shape=[2, 4, 4]),
+                         stride=1,
+                         padding='VALID')
+    out2 = tf.nn.relu(conv2)
+    
+    flat = tf.reshape(out2, [-1, 15*4])
+    print conv2.get_shape()
+    sy_w = tf.Variable(tf.truncated_normal(stddev=0.1,
+                                           shape= [4*15, OUTPUT_DIM]),
+                                           name="output_weight")
+    sy_b = tf.Variable(tf.constant(0.0, shape=[2]), name="output_bias")
+    sy_output = tf.matmul(flat, sy_w) + sy_b
+    
 # calculate cross entropy loss and error indicators
 sy_loss = tf.reduce_mean((sy_output-sy_target)**2)
  
@@ -151,6 +180,10 @@ test_labels= np.stack([data_mod.real, data_mod.imag], axis=1)
 test_data[0,:,:], test_labels[0,:] = test_data[1,:,:], test_labels[1,:]
 test_feed_dict={sy_input: test_data, sy_target: test_labels} 
 
+
+############################################################################
+# PLOTTING
+
 if (PLOT): # show data for demonstrative purposes
     
     NUM_SHOW = 16 # samples to show 
@@ -174,14 +207,15 @@ if (PLOT): # show data for demonstrative purposes
 
     plt.show(block=False)
 
-    # show rc filter
-    fig = plt.figure(figsize=(10,4))
-    plt.title('Root-Raised Cosine Filter', fontsize=20)
-    ax1 = fig.add_subplot(111)
-    ax1.set(ylabel='sample index', xlabel='sample index')
-    ax1.set_xlim([0, rc.shape[0]])
-    ax1.plot(rc)    
-    plt.show(block=False)
+    if (RRC_PLOT):  
+        # show rc filter
+        fig = plt.figure(figsize=(10,4))
+        plt.title('Root-Raised Cosine Filter', fontsize=20)
+        ax1 = fig.add_subplot(111)
+        ax1.set(ylabel='sample index', xlabel='sample index')
+        ax1.set_xlim([0, rc.shape[0]])
+        ax1.plot(rc)    
+        plt.show(block=False)
 
     # show eye-diagramm 
     fig, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(10,8))

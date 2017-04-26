@@ -7,7 +7,7 @@
 #  This script creates random binary data and modulates
 #+ the data according to a given modulation scheme with
 #+ given mapping. It can optionally apply pulse shaping
-#+ with given oversampling factor and root-raised cosine
+#+ with given oversampling factor and raised cosine
 #+ filtering
 #  
 #  can be run in two ways:

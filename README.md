@@ -1,5 +1,15 @@
 # deeprl-project
 
+## Structure
+
+* /shanes_work - shanes stuff
+* /colins_work - colins stuff
+* /base_implementation - fixed receiver, transmitter
+* /decentralized_implementation - decentralized approach
+* /plots - archive for cool gifs and plots to be used in the future
+
+***
+
 ## Deadlines
 
 4/11: fixed Tx/Rx

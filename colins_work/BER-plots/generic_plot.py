@@ -18,7 +18,7 @@ import argparse
 ##################################################
 # parameters
 
-colors = ['#0074D9', '#3D9970', '#85144b','#FF4136']
+colors = ['#3D9970', '#85144b','#FF4136', '#0074D9', '#FFDC00']
 
 SMALL_SIZE = 14
 MEDIUM_SIZE = 18 
@@ -38,8 +38,10 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("file", type=str, nargs='*',
            help="path to csv file()")
+parser.add_argument('-num', action='store_true', help="plot only number of clusters")
 parser.add_argument("--title", type=str, default="Generic Plot",
            help="title to be shown in plot")
+
 
 args = parser.parse_args()
 if (len(args.file) == 2):
@@ -94,26 +96,43 @@ plt.title(title, fontsize=BIGGER_SIZE)
 ax = fig.add_subplot(111)
 plt.show(block=False)
 
-ax.set(ylabel='Bit-Error Rate (BER)', xlabel='$E_b/N_0$ [dB]')
-ax.set_yscale('log')
 ax.set_xlim([-10, 8])
-ax.set_ylim([1e-7, 1])
+h, l = [], [] # legend handels
+
 
 if (double_y): # draw second y axis
     ax2 = ax.twinx()
     ax2.set(ylabel='Number of Clusters')
-    ax2.set_ylim([0, 20])
+    ax2.set_ylim([0, 25])
     ax2.set_xlim([-10, 8])
 
     for k,col in enumerate(data2):
         if (k==0): continue
-        ax2.plot(data2[0], data2[k], color=colors.pop(), lw=3, alpha=0.2)
+        ax2.plot(data2[0], data2[k], color=colors.pop(), lw=3, label=labels2[k], alpha=1)
+    
+    h2, l2 = ax2.get_legend_handles_labels()    
+
+if (not args.num): # plot BER
+    ax.set(ylabel='Bit-Error Rate (BER)', xlabel='$E_b/N_0$ [dB]')
+    ax.set_ylim([1e-7, 1])
+    ax.set_yscale('log')
+else: # plot number of clusters 
+    ax.set(ylabel='Number of clusters', xlabel='$E_b/N_0$ [dB]')
+    ax.set_ylim([0, 25])
+
 
 for i,col in enumerate(data):
     if (i==0): continue
     ax.plot(data[0], data[i], color=colors.pop(), label=labels[i], lw=3)
 
-ax.legend(loc=0)
+h1, l1 = ax.get_legend_handles_labels()    
+
+if (double_y):
+    h, l = h1+h2, l1+l2
+else:
+    h, l = h1, l1
+
+ax.legend(h, l,loc=0)
 
 plt.draw()
 plt.show()

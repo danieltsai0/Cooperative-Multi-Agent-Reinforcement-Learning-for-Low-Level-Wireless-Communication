@@ -3,6 +3,8 @@ figures/
 *.png
 shanes_work/figures/
 *.gif
+*.swp
+*.swn
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
