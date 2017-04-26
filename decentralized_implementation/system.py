@@ -1,7 +1,19 @@
-from actor_basic import *
+################################################################################
+#
+#  Decentralized Learning Implementation - main file
+#
+#  Shane Barratt <stbarratt@gmail.com>
+#  Daniel Tsai
+#  Colin de Vrieze
+#
+#  Sets up a system of two actors who learn to communicate with each other
+#  in a distributed fashion.
+#
+################################################################################
+
 from actor_adv import *
-from transmitter import *
-from receiver import *
+from transmitter_adv import *
+from receiver_adv import *
 from channel import *
 from util import *
 
@@ -9,7 +21,7 @@ from util import *
 class System():
     """
     Inputs:
-        a_or_b (Boolean), represents whether we are using advanced or basic Actors
+        
     """
     def __init__(self, n_bits, groundtruth):
         # General args
@@ -87,14 +99,34 @@ class System():
             print("\n><<><><>><><><><><<>\n")
 
 
+################################################################################
+#
+#  MAIN
+#
+################################################################################
 
 if __name__ == '__main__':
+
     np.random.seed(0)
+    
     # Params
-    n_bits = 2
-    groundtruth = qpsk 
-    num_iterations = 2**10
+    general_params = dict(stepsize=1e-3, 
+                          desired_kl=.005, 
+                          initial_logstd=-1.,
+                          k_innac=5,
+                          k_rec=10, 
+                          l=0.05, 
+                          sigma=.3)
+
+    # TODO replace with commandline-parameters
+    params = dict(seed=0, 
+                  num_iterations = 2**10,
+                  n_bits=2, 
+                  decoding_map=psk, 
+                  num_hidden_per_layer=[32], 
+                  steps_per_episode=128, 
+                  **general_params)
 
     # Run
-    sys = System(n_bits, groundtruth)
+    sys = System(**params)
     sys.run_func(num_iterations)

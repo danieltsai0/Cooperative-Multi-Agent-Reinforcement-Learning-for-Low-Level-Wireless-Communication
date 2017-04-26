@@ -1,3 +1,11 @@
+################################################################################
+#
+#  Utility functions
+#
+#  provides utilities functions for the network and mappings
+#
+################################################################################
+
 import numpy as np
 import tensorflow as tf
 import os
@@ -53,7 +61,6 @@ def fancy_slice_2d(X, inds0, inds1):
 #
 ############################################################ 
 
-# Useful maps
 color_map = {
             0: 'deepskyblue',
             1: 'orangered',
@@ -110,7 +117,6 @@ qam16_legend_map = {
             15: '(1,1,1,1)',
         }
 
-    
 inv_qpsk_legend_map = {v: k for k, v in qpsk_legend_map.items()}
 inv_psk8_legend_map = {v: k for k, v in psk8_legend_map.items()}
 inv_qam16_legend_map = {v: k for k, v in qam16_legend_map.items()}
@@ -181,16 +187,17 @@ def get_mod_vars(n_bits):
     if n_bits == 4:
         return qam16, qam16_legend_map, inv_qam16_legend_map
 
-"""
-Outputs:
-    preamble: random matrix of shape (size,n_bits) of -1 and 1
-"""
+""" Outputs preamble: random matrix of shape (size,n_bits) of -1 and 1 """
 def generate_preamble(size, n_bits):
     return 2*(np.random.randint(0,2,[size,n_bits])-.5)
 
+""" Generates random ID """
 def generate_id():
     return int(np.random.rand()*100000%100000)
 
+""" Creates directory if not existent """
 def create_dir(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
+
+

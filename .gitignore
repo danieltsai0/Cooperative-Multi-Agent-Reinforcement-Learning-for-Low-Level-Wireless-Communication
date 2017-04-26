@@ -1,10 +1,7 @@
 # Project specific
 figures/
-*.png
 shanes_work/figures/
-*.gif
-*.swp
-*.swn
+.*.sw* # all vim tmp files
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

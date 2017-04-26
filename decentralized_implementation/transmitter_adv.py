@@ -1,7 +1,6 @@
 ############################################################
 #
-#  Basic Learning Transmitter
-#  Shane Barratt <stbarratt@gmail.com>
+#  Advanced Learning Transmitter
 #
 #  Network takes in a n_bit long sequence of bits and outputs 
 #  a continuous distribution over x and y, which denote the
@@ -10,89 +9,97 @@
 ############################################################ 
 
 from util import *
-from plot_const import visualize
-
 import tensorflow as tf
 import numpy as np
-import IPython as ipy
 import itertools
 import matplotlib.pyplot as plt
 import time
 
-# normalized constant initializer from cs 294-112 code
-def normc_initializer(std=1.0):
-    def _initializer(shape, dtype=None, partition_info=None):
-        out = np.random.randn(*shape).astype(np.float32)
-        out *= std / np.sqrt(np.square(out).sum(axis=0, keepdims=True))
-        return tf.constant(out)
-    return _initializer
 
 class NeuralTransmitter(object):
-    def __init__(self, n_bits, n_hidden, stepsize, l, groundtruth, preamble, uid):
+    def __init__(self, 
+                 preamble,
+                 n_bits=2,
+                 action_dim=2,
+                 num_hidden_per_layer=[64, 32], 
+                 steps_per_episode=32, 
+                 stepsize=5e-3, 
+                 lambda_power=0.1,
+                 desired_kl=None, 
+                 initial_logstd=-2.): 
+
         # Network parameters
-        self.n_bits = n_bits
-        self.n_hidden = n_hidden
+        self.action_dim = action_dim
+        self.n_hidden_layers = len(num_hidden_per_layer)
+        self.num_hidden_per_layer = num_hidden_per_layer
+        self.desired_kl = desired_kl
+        self.initial_logstd = initial_logstd
+
+        self.steps_per_episode = steps_per_episode
         self.stepsize = stepsize
-        self.l = l # loss rate for power 
+        self.lambda_power = lambda_power # loss rate for power 
+
         # Misc. parameters
-        self.groundtruth = groundtruth
         self.preamble = preamble
-        self.im_dir = 'figures/'+str(uid)+'/'
+        self.n_bits = n_bits
+
+        # for logging images
+        self.im_dir = 'figures/'+str(np.randint(1,10))+'_'+str(n_bits)+'/'
         create_dir(self.im_dir)
         self.im_dir += '%04d.png'
 
-        # Network
-        self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.actions_x = tf.placeholder(tf.float32, [None]) # x
-        self.actions_y = tf.placeholder(tf.float32, [None]) # y
-        self.adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
-        # self.stepsize = tf.placeholder(shape=[], dtype=tf.float32)
-# 
-        # Hidden Layer
-        self.h1 = tf.contrib.layers.fully_connected(
-            inputs = self.input,
-            num_outputs = self.n_hidden,
-            activation_fn = tf.nn.relu, # relu activation for hidden layer
-            weights_initializer = normc_initializer(1.0),
-            biases_initializer = tf.constant_initializer(0.0)
-        )
+        ############################## 
+        # Build Network
+        ##############################
+
+        self.sy_x = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
+        self.sy_actions = tf.placeholder(tf.float32, [None, self.action_dim]) # x actions for gradient calculation
+        self.sy_adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
+        self.sy_stepsize = tf.placeholder(shape=[], dtype=tf.float32) # stepsize for gradient step
+        self.sy_batch_size = tf.placeholder(tf.int32, [])
+
+        # Hidden Layers
+        self.layers = [self.sy_x]
+        for i in range(self.n_hidden_layers):
+            h = tf.contrib.layers.fully_connected(
+                inputs = self.layers[-1],
+                num_outputs = self.num_hidden_per_layer[i],
+                activation_fn = tf.nn.relu, # relu activation for hidden layer
+                weights_initializer = normc_initializer(1.0),
+                biases_initializer = tf.constant_initializer(.1)
+            )
+            self.layers.append(h)
+
+        self.h_last = self.layers[-1]
 
         # Outputs
-        self.x_mean = tf.squeeze(tf.contrib.layers.fully_connected (
-                inputs = self.h1,
-                num_outputs = 1,
+        self.action_means = tf.contrib.layers.fully_connected(
+                inputs = self.h_last,
+                num_outputs = self.action_dim,
                 activation_fn = None,
-                weights_initializer = normc_initializer(0.1),
+                weights_initializer = normc_initializer(.2),
                 biases_initializer = tf.constant_initializer(0.0)
-            ))
-        self.y_mean = tf.squeeze(tf.contrib.layers.fully_connected(
-                inputs = self.h1,
-                num_outputs = 1,
-                activation_fn = None, 
-                weights_initializer = normc_initializer(0.1),
-                biases_initializer = tf.constant_initializer(0.0)
-            ))
-        self.x_logstd = tf.Variable(0.)
-        self.y_logstd = tf.Variable(0.)
-        self.x_std = tf.exp(self.x_logstd)
-        self.y_std = tf.exp(self.y_logstd)
+        )
 
-        # randomized actions
-        self.x_distr = tf.contrib.distributions.Normal(self.x_mean, self.x_std)
-        self.y_distr = tf.contrib.distributions.Normal(self.y_mean, self.y_std)
+        self.x_y_logstds = self.initial_logstd*tf.Variable(tf.ones(shape=self.action_dim))
+        self.x_y_logstds = tf.reshape(self.x_y_logstds, [-1, 1])
+        self.x_y_logstds = tf.tile(self.x_y_logstds, [1, self.sy_batch_size])
+        self.x_y_logstds = tf.transpose(self.x_y_logstds)
 
-        self.x_sample = self.x_distr.sample()
-        self.y_sample = self.y_distr.sample()
+        self.x_y_distr = tf.contrib.distributions.MultivariateNormalDiag(
+                self.action_means, 
+                tf.exp(self.x_y_logstds))
+        self.action_sample = self.x_y_distr.sample()
 
-        # for forming surrogate loss
-        self.x_logprob = self.x_distr.log_prob(self.actions_x)
-        self.y_logprob = self.y_distr.log_prob(self.actions_y)
-
-        self.surr = - tf.reduce_mean(self.adv * (self.y_logprob + self.x_logprob))
-        self.update_op = tf.train.AdamOptimizer(self.stepsize).minimize(self.surr)
+        # Compute log-probabilities for gradient estimation
+        self.x_y_logprob = self.x_y_distr.log_prob(self.sy_actions)
+        self.sy_surr = - tf.reduce_mean(self.sy_adv * self.x_y_logprob)
+        self.optimizer = tf.train.AdamOptimizer(self.sy_stepsize)
+        self.update_op = self.optimizer.minimize(self.sy_surr)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
+
 
     """
     Updates the transmitter based on the input, x and y SAMPLE outputs
@@ -100,13 +107,14 @@ class NeuralTransmitter(object):
     """
     def policy_update(self):
 
-        self.sess.run([self.update_op], feed_dict={
-                self.input: self.trans_input,
-                self.actions_x: self.x_accum,
-                self.actions_y: self.y_accum,
-                self.adv: self.adv_accum,
-                # self.stepsize: self.stepsize
-            })
+        _ = self.sess.run([self.update_op], feed_dict={
+                self.sy_x: self.xs_accum,
+                self.sy_actions: self.actions_accum,
+                self.sy_adv: self.adv,
+                self.sy_stepsize: self.stepsize,
+                self.sy_batch_size: self.actions_accum.shape[0]
+        })      
+ 
 
     """
     Wrapper function for policy update. Receives the bit format of the guess of the 
@@ -118,7 +126,7 @@ class NeuralTransmitter(object):
     """
     # Receive reward signal from other agent. Should be of same length as actions
     def update(self, preamble_g_g_bit):
-        self.adv_accum = - self.ridge_loss(preamble_g_g_bit)
+        self.adv = - self.ridge_loss(preamble_g_g_bit)
         # print("adv_accum.shape:",self.adv_accum.shape)  
         print("avg_reward:",np.average(self.adv_accum))  
         self.policy_update()
@@ -217,11 +225,6 @@ class NeuralTransmitter(object):
         signal: bit format signal to be compared to the original input
     """
     def lasso_loss(self, signal):
-        # print("trans_output.shape:",self.trans_output.shape)
-        # print("trans_output_sum.shape:",(self.l*np.sum(self.trans_output**2,axis=1)).shape)
-        # print("trans_input.shape:",self.trans_input.shape)
-        # print("signal.shape:",signal.shape)
-        # print("linalg.shape:",np.linalg.norm(self.trans_input - signal, ord=1,axis=1).shape)
         return np.linalg.norm(self.trans_input - signal, ord=1, axis=1) + self.l*np.sum(self.trans_output**2,axis=1)
 
     """
