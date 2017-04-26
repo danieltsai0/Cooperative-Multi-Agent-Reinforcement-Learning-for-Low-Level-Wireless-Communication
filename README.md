@@ -2,8 +2,8 @@
 
 ## Structure
 
-* /shanes_work - shanes stuff
-* /colins_work - colins stuff
+* /shanes_work - shanes stuff (private work-folder)
+* /colins_work - colins stuff (private work-folder)
 * /base_implementation - fixed receiver, transmitter
 * /decentralized_implementation - decentralized approach
 * /plots - archive for cool gifs and plots to be used in the future
