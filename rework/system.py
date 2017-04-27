@@ -8,7 +8,7 @@ class System():
 
     def __init__(self, 
                     num_iterations, len_preamble,
-                    groundtruth, n_bits, n_actions, n_hidden, stepsize, lambda_p, initial_logstd,
+                    groundtruth, n_bits, n_hidden, stepsize, lambda_p, initial_logstd,
                     k,
                     channel_func):
 
@@ -74,20 +74,19 @@ if __name__ == '__main__':
 
     # System args
     num_iterations = 1000
-    len_preamble = 1500
+    len_preamble = 200
     n_bits = 4
     groundtruth = util.qam16
-    n_actions = 1
     n_hidden = [20]
-    stepsize = 1e-2
-    lambda_p = 0.25
-    initial_logstd = -2.
+    stepsize = 5e-3
+    lambda_p = .1
+    initial_logstd = -1.
     k = 3
-    channel_func = lambda x: x + np.random.normal(loc=0.0, scale=.2, size=[len_preamble,2])
+    channel_func = lambda x: x + np.random.normal(loc=0.0, scale=.1, size=[len_preamble,2])
 
 
     sys = System(num_iterations, len_preamble,
-                 groundtruth, n_bits, n_actions, n_hidden, stepsize, lambda_p, initial_logstd,
+                 groundtruth, n_bits, n_hidden, stepsize, lambda_p, initial_logstd,
                  k,
                  channel_func)
 
