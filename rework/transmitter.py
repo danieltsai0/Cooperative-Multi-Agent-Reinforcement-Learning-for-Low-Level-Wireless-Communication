@@ -148,5 +148,5 @@ class NeuralTransmitter():
 
 
     def lasso_loss(self, signal_b_g_g):
-        return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1) + \
-                    self.lambda_p*np.sum(self.actions_accum**2,axis=1)
+        return np.linalg.norm(self.preamble - signal_b_g_g, ord=1, axis=1) + \
+                    self.lambda_p*np.sum(self.preamble_mod**2,axis=1)

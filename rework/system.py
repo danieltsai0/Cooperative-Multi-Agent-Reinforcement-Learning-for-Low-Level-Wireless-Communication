@@ -79,7 +79,7 @@ if __name__ == '__main__':
     groundtruth = util.qam16
     n_hidden = [20]
     stepsize = 5e-3
-    lambda_p = .1
+    lambda_p = .25
     initial_logstd = -1.
     k = 3
     channel_func = lambda x: x + np.random.normal(loc=0.0, scale=.1, size=[len_preamble,2])
