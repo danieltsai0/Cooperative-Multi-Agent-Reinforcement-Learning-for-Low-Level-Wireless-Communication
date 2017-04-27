@@ -12,7 +12,7 @@ class Actor():
         return signal_m
 
     def transmitter_update(self, signal_b_g_g):
-        self.transmitter.policy_update(signal_b_g_g)
+        return self.transmitter.policy_update(signal_b_g_g)
 
     def visualize(self, i):
         self.transmitter.visualize(i)
