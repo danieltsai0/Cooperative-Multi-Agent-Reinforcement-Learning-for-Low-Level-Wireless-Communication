@@ -14,12 +14,6 @@ class Actor():
 
     def transmitter_update(self, signal_b_g_g, i):
         stepsize = self.init_stepsize
-        if i > 400:
-            stepsize = stepsize / 2
-        if i > 550:
-            stepsize = stepsize / 4
-        if i > 750:
-            stepsize = stepsize / 6
 
         return self.transmitter.policy_update(signal_b_g_g, stepsize)
 

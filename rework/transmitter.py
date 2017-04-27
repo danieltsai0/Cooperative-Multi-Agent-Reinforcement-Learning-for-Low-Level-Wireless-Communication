@@ -89,7 +89,6 @@ class NeuralTransmitter():
 
     def policy_update(self, signal_b_g_g, stepsize):
         adv = - self.lasso_loss(signal_b_g_g)
-        print("avg reward:",np.average(adv))
 
         _ = self.sess.run([self.update_op], feed_dict={
                 self.input: self.input_accum,
@@ -156,10 +155,10 @@ class NeuralTransmitter():
         
         
         # plot modulated preamble
-        size = 1000
+        size = 10000
         scatter_data = 2*(np.random.randint(0,2,[size,self.n_bits])-.5)
         mod_scatter = self.transmit(scatter_data, save=False)
-        ax.scatter(mod_scatter[:,0], mod_scatter[:,1], alpha=0.2, color="red")
+        ax.scatter(mod_scatter[:,0], mod_scatter[:,1], alpha=0.1, color="red")
 
         plt.xlim([-3, 3])
         plt.ylim([-3, 3])

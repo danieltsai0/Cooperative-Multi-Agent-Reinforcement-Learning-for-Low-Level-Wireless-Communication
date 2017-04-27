@@ -91,15 +91,7 @@ class System():
             self.swap_agents()
 
             print("iteration %d | avg rewards: %8f %8f" % (i, adv1, adv2))
-            print("<><><><>")
-            print("swapping agents")
-            print("<><><><>")
-            self.action_sequence(i)
-            self.swap_agents()
 
-            print("\n<><><><><><><><><><>")
-            print("done with iteration:",i)
-            print("<><><><><><><><><><>\n")
 
 def single_run(params):
     sys = System(**params)
@@ -120,15 +112,15 @@ if __name__ == '__main__':
                      ) 
 
     # Hyperparameter 
-    params = [dict(n_hidden = [20],
-                  stepsize = 1e-2,
+    params = [dict(n_hidden = [40],
+                  stepsize = 5e-3,
                   lambda_p = .1,
                   initial_logstd = 0.,
                   k = 3,
                   num_iterations = 2000,
-                  len_preamble = 200,
-                  n_bits = 2,
-                  noise_power = 0.2,
+                  len_preamble = 2**9,
+                  n_bits = 4,
+                  noise_power = 0.1,
                   **general_params)
               ] 
 
