@@ -31,17 +31,23 @@ class System():
 
         # Transmitter Parameters
         groundtruth = util.schemes[n_bits]
-        t_args = [self.preamble, groundtruth, n_bits, n_hidden, stepsize, 
+        t_args = [self.preamble, groundtruth, n_bits, n_hidden, 
                   lambda_p, initial_logstd]
         r_args = [self.preamble, k]
 
         # Receiver Parameters
-        self.agent_one = actor.Actor(t_args, r_args)
-        self.agent_two = actor.Actor(t_args, r_args)
+        self.agent_one = actor.Actor(t_args, r_args, stepsize)
+        self.agent_two = actor.Actor(t_args, r_args, stepsize)
 
         self.channel = Channel(noise_power)    
 
 
+    """
+    Action sequence that defines one full learning cycle. Starts by transmitting preamble (signal_b_1) from agent one
+    to agent two. Agent two demodulates a guess of the preamble (signal_b_g_2) and transmits back the preamble and 
+    the generated guess of the preamble (signal_b_2, and signal_b_g_2 resp). Agent one receives these two signals and
+    demodulates a guess of the guess of the preamble (signal_b_g_g_1) and updates its transmitter with it.
+    """
     def action_sequence(self, i):
         # Compute signal_b here
         signal_b = self.preamble
@@ -59,18 +65,23 @@ class System():
         # Receive mod signal guess, produce bit signal guess of guess
         signal_b_g_g_1 = self.agent_one.receive(signal_m_2, signal_m_g_2)
         # Update transmitter with bit signal guess of guess
-        adv = self.agent_one.transmitter_update(signal_b_g_g_1)
-
+        adv = self.agent_one.transmitter_update(signal_b_g_g_1, i)
         # Visualize transmitter
         if (i % plot_every == 0):
             self.agent_one.visualize(i)
-
         return adv
 
+    """
+    Internal function to swap the agents for echoed learning.
+    """
     def swap_agents(self):
         temp = self.agent_one
         self.agent_one = self.agent_two
         self.agent_two = temp
+
+    """
+    Run learning simulation.
+    """
 
     def run_sim(self):
         for i in range(self.num_iterations):
@@ -80,7 +91,15 @@ class System():
             self.swap_agents()
 
             print("iteration %d | avg rewards: %8f %8f" % (i, adv1, adv2))
+            print("<><><><>")
+            print("swapping agents")
+            print("<><><><>")
+            self.action_sequence(i)
+            self.swap_agents()
 
+            print("\n<><><><><><><><><><>")
+            print("done with iteration:",i)
+            print("<><><><><><><><><><>\n")
 
 def single_run(params):
     sys = System(**params)
@@ -117,5 +136,3 @@ if __name__ == '__main__':
      
     #p = multiprocessing.Pool()
     #p.map(single_run, params)
-
-

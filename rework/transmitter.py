@@ -11,7 +11,6 @@ class NeuralTransmitter():
                  groundtruth = util.qpsk,
                  n_bits = 2,
                  n_hidden = [32, 20],
-                 stepsize = 1e-2,
                  lambda_p = 0.1,
                  initial_logstd = -2.
                  ):
@@ -30,10 +29,11 @@ class NeuralTransmitter():
 
         # Placeholders for training
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
-        self.actions = tf.placeholder(tf.float32, [None, 2])
+        self.actions_re = tf.placeholder(tf.float32, [None]) 
+        self.actions_im = tf.placeholder(tf.float32, [None])
         self.adv = tf.placeholder(tf.float32, [None]) # advantages for gradient computation
+        self.stepsize = tf.placeholder(shape=[], dtype=tf.float32) 
         self.batch_size = tf.placeholder(tf.int32, [])
-        # self.stepsize = tf.placeholder(tf.float32, []) # stepsize
     
         # Network definiton
         layers = [self.input]
@@ -43,69 +43,89 @@ class NeuralTransmitter():
                 num_outputs = num,
                 activation_fn = tf.nn.relu, # relu activation for hidden layer
                 weights_initializer = util.normc_initializer(1.0),
-                biases_initializer = tf.constant_initializer(0.)
+                biases_initializer = tf.constant_initializer(.1)
             )
             layers.append(h)
 
-        self.action_means = tf.contrib.layers.fully_connected(
+        self.re_mean = tf.squeeze(tf.contrib.layers.fully_connected(
                 inputs = layers[-1],
-                num_outputs = 2,
+                num_outputs = 1,
                 activation_fn = None,
-                weights_initializer = util.normc_initializer(1.0),
-                biases_initializer = tf.constant_initializer(0.)
-        )
+                weights_initializer = util.normc_initializer(.2),
+                biases_initializer = tf.constant_initializer(0.0)
+        ))
 
-        self.action_logstds = initial_logstd*tf.Variable(tf.ones(shape=2))
-        self.action_logstds = tf.reshape(self.action_logstds, [-1, 1])
-        self.action_logstds = tf.tile(self.action_logstds, [1, self.batch_size])
-        self.action_logstds = tf.transpose(self.action_logstds)
+        self.im_mean = tf.squeeze(tf.contrib.layers.fully_connected(
+                inputs = layers[-1],
+                num_outputs = 1,
+                activation_fn = None,
+                weights_initializer = util.normc_initializer(.2),
+                biases_initializer = tf.constant_initializer(0.0)
+        ))
 
-        self.action_distr = tf.contrib.distributions.MultivariateNormalDiag(
-                self.action_means, 
-                tf.exp(self.action_logstds))
+        self.re_logstd = tf.Variable(initial_logstd)
+        self.im_logstd = tf.Variable(initial_logstd)
+        self.re_std = tf.exp(self.re_logstd)
+        self.im_std = tf.exp(self.im_logstd)
 
-        self.action_sample = self.action_distr.sample()
+        # randomized actions
+        self.re_distr = tf.contrib.distributions.Normal(self.re_mean, self.re_std)
+        self.im_distr = tf.contrib.distributions.Normal(self.im_mean, self.im_std)
+
+        self.re_sample = self.re_distr.sample()
+        self.im_sample = self.im_distr.sample()
 
         # Compute log-probabilities for gradient estimation
-        self.action_logprob = self.action_distr.log_prob(self.actions)
-        self.surr = - tf.reduce_mean(self.adv * self.action_logprob)
-        self.optimizer = tf.train.AdamOptimizer(stepsize)
+        self.re_logprob = self.re_distr.log_prob(self.actions_re)
+        self.im_logprob = self.im_distr.log_prob(self.actions_im)
+
+        self.surr = - tf.reduce_mean(self.adv * (self.re_logprob + self.im_logprob))
+        self.optimizer = tf.train.AdamOptimizer(self.stepsize)
         self.update_op = self.optimizer.minimize(self.surr)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
 
-    def policy_update(self, signal_b_g_g):
-        adv = -self.lasso_loss(signal_b_g_g)
+    def policy_update(self, signal_b_g_g, stepsize):
+        adv = - self.lasso_loss(signal_b_g_g)
+        print("avg reward:",np.average(adv))
 
         _ = self.sess.run([self.update_op], feed_dict={
-                self.input: self.preamble,
-                self.actions: self.preamble_mod,
+                self.input: self.input_accum,
+                self.actions_re: self.actions_re_accum,
+                self.actions_im: self.actions_im_accum,
                 self.adv: adv,
-                self.batch_size: self.preamble.shape[0]
+                self.stepsize: stepsize,
+                self.batch_size: self.input_accum.shape[0]
         })
         
         return np.average(adv)
 
     def transmit(self, signal_b, save=True):
-        signal_m = self.sess.run(self.action_sample, feed_dict={
+
+        re, im, rel, iml = self.sess.run([self.re_sample, self.im_sample, self.re_logstd, self.im_logstd], feed_dict={
                 self.input: signal_b,
                 self.batch_size: signal_b.shape[0]
             })
-
+        # print("rel:",np.exp(rel))
+        # print("iml:",np.exp(iml))
         if save:
-            self.preamble_mod = signal_m
+            self.input_accum = signal_b
+            self.actions_re_accum = np.squeeze(re)
+            self.actions_im_accum = np.squeeze(im)
+
+        signal_m = np.array([np.squeeze(re),np.squeeze(im)]).T
         return signal_m 
 
 
     def evaluate(self, signal_b):
         # run policy
-        return np.squeeze(self.sess.run(self.action_means, feed_dict={
+        re, im = np.squeeze(self.sess.run([self.re_mean, self.im_mean], feed_dict={
                 self.input: signal_b,
                 self.batch_size: signal_b.shape[0]
             }))   
-
+        return np.squeeze(re), np.squeeze(im)
 
     def visualize(self, iteration):
         start_time = time.time()
@@ -130,9 +150,9 @@ class NeuralTransmitter():
     
         if self.groundtruth:
             for k in self.groundtruth.keys():
-                x_gt, y_gt = self.groundtruth[k]
-                ax.scatter(x_gt, y_gt, s=5, color='purple')
-                # ax.annotate(''.join([str(b) for b in k]), (x_gt, y_gt), size=5)
+                re_gt, im_gt = self.groundtruth[k]
+                ax.scatter(re_gt, im_gt, s=5, color='purple')
+                # ax.annotate(''.join([str(b) for b in k]), (re_gt, im_gt), size=5)
         
         
         # plot modulated preamble
@@ -148,5 +168,7 @@ class NeuralTransmitter():
 
 
     def lasso_loss(self, signal_b_g_g):
-        return np.linalg.norm(self.preamble - signal_b_g_g, ord=1, axis=1) + \
-                    self.lambda_p*np.sum(self.preamble_mod**2,axis=1)
+        # return np.linalg.norm(self.preamble - signal_b_g_g, ord=1, axis=1) + \
+        #             self.lambda_p*np.sum(self.preamble_mod**2,axis=1)
+        return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1) + \
+                    self.lambda_p*(self.actions_re_accum**2 + self.actions_im_accum**2)
