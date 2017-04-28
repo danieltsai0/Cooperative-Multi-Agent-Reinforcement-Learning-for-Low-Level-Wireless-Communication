@@ -14,7 +14,7 @@ from random import randint, uniform
 import pprint
 import time
 import json
-   
+import shutil   
 
 class System():
 
@@ -89,6 +89,8 @@ class System():
     Run learning simulation.
     """
     def run_sim(self):
+       
+        threshold = -1 # reward threshold to discard runs 
         for i in range(self.num_iterations):
             adv1 = self.action_sequence(i)
             self.swap_agents()
@@ -99,6 +101,11 @@ class System():
         self.agent_one.save_stats()
         self.agent_two.save_stats()
 
+        # return if the final reward is over below threshold 
+        if (adv1 < threshold or adv2 < threshold):
+            return False
+        
+        return True 
 
 """ execute a single run with a set of hyperparameters """
 def single_run(params):
@@ -117,7 +124,11 @@ def single_run(params):
     print ('\n')
 
     sys = System(**params)
-    return sys.run_sim()
+    reward_constraint = sys.run_sim()
+
+    # if reward constraints not met -> discard
+    if (reward_constraint == False):
+       shutil.move(directory, discard_dir+str(params['run_id'])+'/')
        
 """ generate a run ID based on the unix timestamp """
 def gen_id():
@@ -147,7 +158,9 @@ if __name__ == '__main__':
 
     np.random.seed(0)
     output_dir = "output/"
+    discard_dir = output_dir+"shitty/"
     util.create_dir(output_dir)    
+    util.create_dir(discard_dir)
 
     # read plot_every from commandline
     plot_every = 25 
