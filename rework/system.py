@@ -15,6 +15,7 @@ import pprint
 import time
 import json
    
+
 class System():
 
     def __init__(self,
@@ -41,8 +42,8 @@ class System():
         r_args = [self.preamble, k]
 
         # Receiver Parameters
-        self.agent_one = actor.Actor(t_args, r_args, stepsize, str(run_id)+'_1/')
-        self.agent_two = actor.Actor(t_args, r_args, stepsize, str(run_id)+'_2/')
+        self.agent_one = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_1/')
+        self.agent_two = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_2/')
 
         self.channel = Channel(noise_power)    
 
@@ -93,8 +94,10 @@ class System():
             self.swap_agents()
             adv2 = self.action_sequence(i)
             self.swap_agents()
-
             print("iteration %d | avg rewards: %8f %8f" % (i, adv1, adv2))
+
+        self.agent_one.save_stats()
+        self.agent_two.save_stats()
 
 
 """ execute a single run with a set of hyperparameters """
@@ -105,12 +108,13 @@ def single_run(params):
     with open(directory+'params.log', 'w') as output_file:
         output_file.write(str(params['run_id']))
         output_file.write('\n\n')
-        for key, value in params.iteritems():
-            output_file.write("%s: %s\n" % (str(key), str(value)))         
+        for key, value in params.items():
+            output_file.write("%s: %s\n" % (str(key), str(value)))
+        output_file.write('\n')         
 
     print("Run ID: %d" % params['run_id'])
-    print params
-    print '\n'
+    print (params)
+    print ('\n')
 
     sys = System(**params)
     return sys.run_sim()
@@ -132,7 +136,7 @@ def hyperparam_sweep(general_params, total):
                    k              = randint(1,6),
                    num_iterations = 2000,
                    len_preamble   = 2**9,
-                   n_bits         = 4,
+                   n_bits         = 2,
                    noise_power    = uniform(0,1),
                    **general_params)
         params.append(run)
@@ -161,7 +165,7 @@ if __name__ == '__main__':
                   lambda_p = .1,
                   initial_logstd = 0.,
                   k = 3,
-                  num_iterations = 2000,
+                  num_iterations = 1,
                   len_preamble = 2**9,
                   n_bits = 4,
                   noise_power = 0.1,

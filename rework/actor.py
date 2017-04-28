@@ -1,11 +1,15 @@
 import transmitter
 import receiver
+import pickle
+import util
 
 class Actor():
-    def __init__(self, t_args, r_args, stepsize):
-        self.transmitter = transmitter.NeuralTransmitter(*t_args)
+    def __init__(self, t_args, r_args, stepsize, dirname):
+        self.transmitter = transmitter.NeuralTransmitter(*(t_args+[dirname]))
         self.receiver = receiver.KnnReceiver(*r_args)
         self.init_stepsize = stepsize
+        self.dirname = dirname
+        util.create_dir(self.dirname)
 
 
     def transmit(self, signal_b):
@@ -24,3 +28,14 @@ class Actor():
         signal_b = self.receiver.receive(*args)
         return signal_b
 
+    def save_stats(self):
+        avg_power = self.transmitter.get_last_avg_power()
+        centroid_dict, avg_hamming = self.transmitter.get_centroids_and_hamming()
+        # Save stats
+        with open(self.dirname+'stats.log', 'w') as output_file:
+            output_file.write("### Statistics ###\n\n")
+            output_file.write("Average power: "+str(avg_power)+"\n\n")
+            output_file.write("Average hamming distance: "+str(avg_hamming)+"\n\n")
+        # Dump centroid dictionary
+        with open(self.dirname+'centroid.pickle', 'wb') as output_file:
+            pickle.dump(centroid_dict, output_file)

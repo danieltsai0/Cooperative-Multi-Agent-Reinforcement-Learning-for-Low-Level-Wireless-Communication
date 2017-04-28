@@ -12,7 +12,8 @@ class NeuralTransmitter():
                  n_bits = 2,
                  n_hidden = [32, 20],
                  lambda_p = 0.1,
-                 initial_logstd = -2.
+                 initial_logstd = -2.,
+                 im_dir = None
                  ):
 
         # Network variables
@@ -20,12 +21,8 @@ class NeuralTransmitter():
         self.lambda_p = lambda_p
         self.n_bits = n_bits
         self.groundtruth = groundtruth
-
-        # Create image directories
-        self.im_dir = 'figures/'+str(np.random.randint(1,1000))+'_'+str(self.n_bits)+'/'
-        util.create_dir(self.im_dir)
+        self.im_dir = im_dir
         self.im_dir += '%04d.png'
-        print("im_dir:",self.im_dir)
 
         # Placeholders for training
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
@@ -131,13 +128,13 @@ class NeuralTransmitter():
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
         """
-        bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
+        
         
         fig = plt.figure(figsize=(8, 8))
         plt.title('Constellation Diagram', fontsize=20)
         ax = fig.add_subplot(111)
         ax.set(ylabel='imaginary part', xlabel='real part')
-
+        bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
         for bs in bitstrings:
             x,y = self.evaluate(np.array(bs)[None])
             label = (np.array(bs)+1)/2
@@ -170,4 +167,30 @@ class NeuralTransmitter():
         # return np.linalg.norm(self.preamble - signal_b_g_g, ord=1, axis=1) + \
         #             self.lambda_p*np.sum(self.preamble_mod**2,axis=1)
         return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1) + \
-                    self.lambda_p*(self.actions_re_accum**2 + self.actions_im_accum**2)
+                    self.lambda_p*(self.actions_re_accum**2 + self.actions_im_accum**2) + \
+                    self.lambda_p*np.average(self.actions_re_accum**2 + self.actions_im_accum**2)
+
+    #####################
+    # Methods for stats #
+    #####################
+
+    def get_last_avg_power(self):
+        return np.average(self.actions_re_accum**2 + self.actions_im_accum**2)
+
+    def get_centroids_and_hamming(self):
+
+        coords_ary = np.empty((0,2))
+        labels_ary = np.empty((0,self.n_bits))
+        bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
+        for bs in bitstrings:
+            coords_ary = np.r_[coords_ary,np.array(self.evaluate(np.array(bs)[None]))[None]]
+            labels_ary = np.r_[labels_ary,(np.array(bs)[None]+1)/2]
+
+        labels_tuple = [tuple(x) for x in labels_ary.tolist()]
+        centroid_dict = dict(zip(labels_tuple, coords_ary.tolist()))
+        return centroid_dict, self.compute_avg_hamming(coords_ary, labels_ary)
+
+
+    def compute_avg_hamming(self, coords, labels):
+        k = 3
+        return util.avg_hamming(k, coords, labels)

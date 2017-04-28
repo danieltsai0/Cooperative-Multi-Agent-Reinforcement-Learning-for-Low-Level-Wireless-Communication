@@ -166,6 +166,7 @@ schemes = {2: qpsk,
            4: qam16,
            5: null}
 
+
 ############################################################
 #
 #  Misc utility functions
@@ -207,4 +208,43 @@ def create_dir(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
+
+def mode_rows(a):
+        a = np.ascontiguousarray(a)
+        void_dt = np.dtype((np.void, a.dtype.itemsize * a.shape[1]))
+        _,ids, count = np.unique(a.view(void_dt).ravel(), \
+                                    return_index=1,return_counts=1)
+        largest_count_id = ids[count.argmax()]
+        most_frequent_row = a[largest_count_id]
+        return most_frequent_row[None]
+
+
+def knn(k, data, labels, signal_m=None):
+
+    if signal_m is None:
+        signal = data
+        d_func = lambda dist: dist.argsort()[1:k+1]
+    else:
+        signal = signal_m
+        d_func = lambda dist: dist.argsort()[:k]
+
+    signal_b = np.empty((0, labels.shape[1]))
+
+    for d in signal:
+        dist = np.linalg.norm(d - data, axis=1)
+        idx = d_func(dist)
+        signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
+
+    return signal_b
+
+
+def avg_hamming(k, centroids, labels):
+    avg_dist = 0.0
+
+    for d,l in zip(centroids, labels):
+        dist = np.linalg.norm(d - centroids, axis=1)
+        idx = dist.argsort()[1:k+1]
+        avg_dist += np.average(np.sum(np.abs(l - labels[idx,:]), axis=1))
+
+    return avg_dist / labels.shape[0]
 
