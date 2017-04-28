@@ -2,6 +2,15 @@
 #
 #  Decentralized Multi-Agent Learning Environment
 #
+#  Can perform a single run or a sweep over parameter.
+#  Each run gets a unique ID and its parameters, results
+#  and constellation points (pickle + plot) are saved in 
+#  a folder named after the ID in the *output* directory.
+#
+#  Data from runs which score below a certain loss threshold gets moved to 
+#  a *discard* directory. All final constellation diagram plots from successfull
+#  runs are exported in the *preview* directory for easy inspection.
+#
 ################################################################################
 
 import numpy as np
@@ -91,7 +100,7 @@ class System():
     def run_sim(self):
        
         threshold = -10 # reward threshold to discard runs 
-        for i in range(self.num_iterations):
+        for i in range(self.num_iterations+1):
             adv1 = self.action_sequence(i)
             self.swap_agents()
             adv2 = self.action_sequence(i)
@@ -128,8 +137,13 @@ def single_run(params):
 
     # if reward constraints not met -> discard
     if (reward_constraint == False):
-       shutil.move(directory, discard_dir+str(params['run_id'])+'/')
-       
+        shutil.move(directory, discard_dir+str(params['run_id'])+'/')
+    else: # copy final plot to preview directory    
+        filename = "%04d.png" % (int(params['num_iterations']/plot_every)*plot_every)
+        new_filename = str(params['run_id'])
+        shutil.copy(directory+'agent_1/'+filename, preview_dir+new_filename+'_1.png')
+        shutil.copy(directory+'agent_2/'+filename, preview_dir+new_filename+'_2.png')
+   
 """ generate a run ID based on the unix timestamp """
 def gen_id():
     return int(time.time()*1e6)
@@ -143,11 +157,11 @@ def hyperparam_sweep(general_params, total):
                    n_hidden       = [randint(20, 80)],
                    stepsize       = uniform(1e-4, 1e-2),
                    lambda_p       = uniform(1e-3, 1e-1),
-                   initial_logstd = uniform(-4,1),
-                   k              = randint(1,6),
-                   num_iterations = 2000,
-                   len_preamble   = 2**9,
-                   n_bits         = 2,
+                   initial_logstd = uniform(-3,2),
+                   k              = 3,
+                   num_iterations = 1000,
+                   len_preamble   = 2**7,
+                   n_bits         = 4,
                    noise_power    = uniform(0,1),
                    **general_params)
         params.append(run)
@@ -158,9 +172,11 @@ if __name__ == '__main__':
 
     np.random.seed(0)
     output_dir = "output/"
-    discard_dir = output_dir+"shitty/"
+    discard_dir = output_dir+"shitty/" # runs that don't meet the loss threshold
+    preview_dir = output_dir+"preview/" # folder for all final constellations
     util.create_dir(output_dir)    
     util.create_dir(discard_dir)
+    util.create_dir(preview_dir)
 
     # read plot_every from commandline
     plot_every = 25 
@@ -184,15 +200,15 @@ if __name__ == '__main__':
                   noise_power = 0.1,
                   **general_params)
     
-    params_sweep = hyperparam_sweep(general_params, 100)
+    params_sweep = hyperparam_sweep(general_params, 10)
 
     ##############   
     # SINGLE RUN
     ##############  
-    single_run(params_single) 
+    #single_run(params_single) 
     
     ###################   
     # PARAMETER SWEEP 
     ##################  
     p = multiprocessing.Pool()
-    #p.map(single_run, params_sweep)
+    p.map(single_run, params_sweep)
