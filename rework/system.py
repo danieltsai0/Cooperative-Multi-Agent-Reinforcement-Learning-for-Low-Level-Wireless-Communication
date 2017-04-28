@@ -90,7 +90,7 @@ class System():
     """
     def run_sim(self):
        
-        threshold = -1 # reward threshold to discard runs 
+        threshold = -10 # reward threshold to discard runs 
         for i in range(self.num_iterations):
             adv1 = self.action_sequence(i)
             self.swap_agents()
