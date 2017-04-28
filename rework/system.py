@@ -10,10 +10,15 @@ from channel import Channel
 import util
 import multiprocessing
 import sys
-
+from random import randint, uniform
+import pprint
+import time
+import json
+   
 class System():
 
     def __init__(self,
+                 run_id,
                  plot_every, 
                  num_iterations, 
                  len_preamble, 
@@ -36,8 +41,8 @@ class System():
         r_args = [self.preamble, k]
 
         # Receiver Parameters
-        self.agent_one = actor.Actor(t_args, r_args, stepsize)
-        self.agent_two = actor.Actor(t_args, r_args, stepsize)
+        self.agent_one = actor.Actor(t_args, r_args, stepsize, str(run_id)+'_1/')
+        self.agent_two = actor.Actor(t_args, r_args, stepsize, str(run_id)+'_2/')
 
         self.channel = Channel(noise_power)    
 
@@ -82,7 +87,6 @@ class System():
     """
     Run learning simulation.
     """
-
     def run_sim(self):
         for i in range(self.num_iterations):
             adv1 = self.action_sequence(i)
@@ -93,17 +97,56 @@ class System():
             print("iteration %d | avg rewards: %8f %8f" % (i, adv1, adv2))
 
 
+""" execute a single run with a set of hyperparameters """
 def single_run(params):
+   
+    directory = output_dir+str(params['run_id'])+'/'
+    util.create_dir(directory)
+    with open(directory+'params.log', 'w') as output_file:
+        output_file.write(str(params['run_id']))
+        output_file.write('\n\n')
+        for key, value in params.iteritems():
+            output_file.write("%s: %s\n" % (str(key), str(value)))         
+
+    print("Run ID: %d" % params['run_id'])
+    print params
+    print '\n'
+
     sys = System(**params)
     return sys.run_sim()
-        
+       
+""" generate a run ID based on the unix timestamp """
+def gen_id():
+    return int(time.time()*1e6)
+ 
+""" sample the hyperparameter space for sweeps """
+def hyperparam_sweep(general_params, total):
+   
+    params = [] 
+    for t in range(total):
+        run = dict(run_id         = gen_id(),
+                   n_hidden       = [randint(20, 80)],
+                   stepsize       = uniform(1e-4, 1e-2),
+                   lambda_p       = uniform(1e-3, 1e-1),
+                   initial_logstd = uniform(-4,1),
+                   k              = randint(1,6),
+                   num_iterations = 2000,
+                   len_preamble   = 2**9,
+                   n_bits         = 4,
+                   noise_power    = uniform(0,1),
+                   **general_params)
+        params.append(run)
+
+    return params
 
 if __name__ == '__main__':
 
     np.random.seed(0)
+    output_dir = "output/"
+    util.create_dir(output_dir)    
 
     # read plot_every from commandline
-    plot_every = 10
+    plot_every = 25 
     if len(sys.argv) == 2:
         plot_every = int(sys.argv[1])
 
@@ -111,8 +154,9 @@ if __name__ == '__main__':
     general_params = dict(plot_every = plot_every,
                      ) 
 
-    # Hyperparameter 
-    params = [dict(n_hidden = [40],
+    # Hyperparameters 
+    params_single = dict(run_id = gen_id(),
+                  n_hidden = [40],
                   stepsize = 5e-3,
                   lambda_p = .1,
                   initial_logstd = 0.,
@@ -122,9 +166,16 @@ if __name__ == '__main__':
                   n_bits = 4,
                   noise_power = 0.1,
                   **general_params)
-              ] 
+    
+    params_sweep = hyperparam_sweep(general_params, 100)
 
-    single_run(params[0]) 
-     
-    #p = multiprocessing.Pool()
-    #p.map(single_run, params)
+    ##############   
+    # SINGLE RUN
+    ##############  
+    single_run(params_single) 
+    
+    ###################   
+    # PARAMETER SWEEP 
+    ##################  
+    p = multiprocessing.Pool()
+    #p.map(single_run, params_sweep)

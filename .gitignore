@@ -1,7 +1,8 @@
 # Project specific
-figures/
 shanes_work/figures/
 *.swp
+rework/output/
+rework/figures/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
