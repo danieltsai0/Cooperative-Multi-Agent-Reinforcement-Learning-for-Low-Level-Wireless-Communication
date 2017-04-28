@@ -174,23 +174,22 @@ class NeuralTransmitter():
     # Methods for stats #
     #####################
 
-    def get_last_avg_power(self):
-        return np.average(self.actions_re_accum**2 + self.actions_im_accum**2)
 
-    def get_centroids_and_hamming(self):
-
+    def get_stats(self):
+        # Variables
+        k = 3
         coords_ary = np.empty((0,2))
         labels_ary = np.empty((0,self.n_bits))
         bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
+        # Generate centroids
         for bs in bitstrings:
             coords_ary = np.r_[coords_ary,np.array(self.evaluate(np.array(bs)[None]))[None]]
             labels_ary = np.r_[labels_ary,(np.array(bs)[None]+1)/2]
 
+        # Create centroid_dict
         labels_tuple = [tuple(x) for x in labels_ary.tolist()]
         centroid_dict = dict(zip(labels_tuple, coords_ary.tolist()))
-        return centroid_dict, self.compute_avg_hamming(coords_ary, labels_ary)
+        # Calculate avg power
+        avg_power = np.average(np.sum(coords_ary**2, axis=1))
 
-
-    def compute_avg_hamming(self, coords, labels):
-        k = 3
-        return util.avg_hamming(k, coords, labels)
+        return centroid_dict, avg_power, util.avg_hamming(k, coords_ary, labels_ary)

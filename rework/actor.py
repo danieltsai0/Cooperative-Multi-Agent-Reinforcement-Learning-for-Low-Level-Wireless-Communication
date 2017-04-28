@@ -29,8 +29,7 @@ class Actor():
         return signal_b
 
     def save_stats(self):
-        avg_power = self.transmitter.get_last_avg_power()
-        centroid_dict, avg_hamming = self.transmitter.get_centroids_and_hamming()
+        centroid_dict, avg_power, avg_hamming = self.transmitter.get_stats()
         # Save stats
         with open(self.dirname+'stats.log', 'w') as output_file:
             output_file.write("### Statistics ###\n\n")
