@@ -1,5 +1,15 @@
 # deeprl-project
 
+## Structure
+
+* /shanes_work - shanes stuff (private work-folder)
+* /colins_work - colins stuff (private work-folder)
+* /base_implementation - fixed receiver, transmitter
+* /decentralized_implementation - decentralized approach
+* /plots - archive for cool gifs and plots to be used in the future
+
+***
+
 ## Deadlines
 
 4/11: fixed Tx/Rx
@@ -33,3 +43,5 @@ tasks:
 [https://www.sharelatex.com/project/58eedf885eecccdc7a8817a8](https://www.sharelatex.com/project/58eedf885eecccdc7a8817a8)
 ### CS294-133:
 [https://www.sharelatex.com/project/58bf4907d9f1e6e906db8ad5](https://www.sharelatex.com/project/58bf4907d9f1e6e906db8ad5)
+### Final Report
+[https://www.sharelatex.com/project/58fe82f296da09b1289caec3](https://www.sharelatex.com/project/58fe82f296da09b1289caec3)
