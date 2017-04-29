@@ -160,7 +160,7 @@ def hyperparam_sweep(general_params, total):
     params = [] 
     for t in range(total):
         run = dict(run_id         = gen_id(),
-                   n_hidden       = 40,
+                   n_hidden       = [40],
                    stepsize       = uniform(1e-4, 1e-2),
                    lambda_p       = uniform(1e-3, 1e-1),
                    initial_logstd = uniform(-1.5,0),
