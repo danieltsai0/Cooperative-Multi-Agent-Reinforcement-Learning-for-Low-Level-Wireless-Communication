@@ -131,7 +131,7 @@ def _main_showcase():
 
     generator = Data_generator()
     data_raw, data_mod, data_os, data_shaped, rc = generator.get_pulseshaped_data(1000, '8psk', 16)
-    print data_raw.shape, data_mod.shape, data_os.shape, data_shaped.shape
+    print(data_raw.shape, data_mod.shape, data_os.shape, data_shaped.shape)
     plt.plot(rc)
     plt.figure()
     plt.stem(data_os[:12*16].real, axis=0)
