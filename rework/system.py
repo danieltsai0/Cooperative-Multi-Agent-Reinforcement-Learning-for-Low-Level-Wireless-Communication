@@ -97,7 +97,7 @@ class System():
     """
     Run learning simulation.
     """
-    def run_sim(self):
+    def run_sim(self, verbose):
        
         threshold = -10 # reward threshold to discard runs 
         for i in range(self.num_iterations+1):
@@ -105,7 +105,8 @@ class System():
             self.swap_agents()
             adv2 = self.action_sequence(i)
             self.swap_agents()
-            print("iteration %d | avg rewards: %8f %8f" % (i, adv1, adv2))
+            if (verbose):
+                print("iteration %d | avg rewards: %8f %8f" % (i, adv1, adv2))
 
         self.agent_one.save_stats()
         self.agent_two.save_stats()
@@ -117,8 +118,8 @@ class System():
         return True 
 
 """ execute a single run with a set of hyperparameters """
-def single_run(params):
-   
+def single_run(params, verbose=False):
+
     directory = output_dir+str(params['run_id'])+'/'
     util.create_dir(directory)
     with open(directory+'params.log', 'w') as output_file:
@@ -128,12 +129,13 @@ def single_run(params):
             output_file.write("%s: %s\n" % (str(key), str(value)))
         output_file.write('\n')         
 
-    print("Run ID: %d" % params['run_id'])
-    print (params)
-    print ('\n')
+    if (verbose):
+        print("Run ID: %d" % params['run_id'])
+        print (params)
+        print ('\n')
 
     sys = System(**params)
-    reward_constraint = sys.run_sim()
+    reward_constraint = sys.run_sim(verbose)
 
     # if reward constraints not met -> discard
     if (reward_constraint == False):
@@ -143,7 +145,11 @@ def single_run(params):
         new_filename = str(params['run_id'])
         shutil.copy(directory+'agent_1/'+filename, preview_dir+new_filename+'_1.png')
         shutil.copy(directory+'agent_2/'+filename, preview_dir+new_filename+'_2.png')
-   
+  
+    with iterations.get_lock():
+        iterations.value += 1
+    print ("runs completed: %d" % iterations.value) 
+     
 """ generate a run ID based on the unix timestamp """
 def gen_id():
     return int(time.time()*1e6)
@@ -154,22 +160,24 @@ def hyperparam_sweep(general_params, total):
     params = [] 
     for t in range(total):
         run = dict(run_id         = gen_id(),
-                   n_hidden       = [randint(20, 80)],
+                   n_hidden       = [40],
                    stepsize       = uniform(1e-4, 1e-2),
                    lambda_p       = uniform(1e-3, 1e-1),
-                   initial_logstd = uniform(-3,2),
+                   initial_logstd = uniform(-1.5,0),
                    k              = 3,
-                   num_iterations = 1000,
+                   num_iterations = 2000,
                    len_preamble   = 2**7,
                    n_bits         = 4,
-                   noise_power    = uniform(0,1),
+                   noise_power    = uniform(0.05,0.5),
                    **general_params)
+
         params.append(run)
 
     return params
 
 if __name__ == '__main__':
 
+    iterations = multiprocessing.Value('i', 0)
     np.random.seed(0)
     output_dir = "output/"
     discard_dir = output_dir+"shitty/" # runs that don't meet the loss threshold
@@ -200,15 +208,22 @@ if __name__ == '__main__':
                   noise_power = 0.1,
                   **general_params)
     
-    params_sweep = hyperparam_sweep(general_params, 10)
+    params_sweep = hyperparam_sweep(general_params, 1000)
+
+    #############
+    # SWITCH
+    run_sweep = True 
 
     ##############   
     # SINGLE RUN
     ##############  
-    #single_run(params_single) 
+    if not run_sweep:
+        single_run(params_single, verbose=True) 
     
     ###################   
     # PARAMETER SWEEP 
     ##################  
-    p = multiprocessing.Pool()
-    p.map(single_run, params_sweep)
+    else:
+        print ("Executing parameter sweep with %d runs" % len(params_sweep))
+        p = multiprocessing.Pool()
+        p.map(single_run, params_sweep)
