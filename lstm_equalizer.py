@@ -20,13 +20,12 @@ from Data_generator import Data_generator
 class equalizer():
     def __init__(self):
         self.config()
-        self.build_graph()
     def run(self):
         data, target = self.build_experiment(self.SEQUENCE_LENGTH,
                                              self.TOTAL_NUMBER_SEQUENCES,
                                              self.CONSTELLATION,
                                              self.DELAY_LENGTH)
-        iter_error, val_error = self.train(data, target)
+        iter_error, val_error = self.build_graph(data, target)
         self.write_results(iter_error, val_error)
 
     ################################################################################
@@ -56,7 +55,7 @@ class equalizer():
     #
     # COMPUTATIONAL GRAPH
     ###############################################################################
-    def build_graph(self):
+    def build_graph(self, data, target):
         # input dimensions: (#batch, #timestep, data dimension)
         #batch_size = tf.placeholder(tf.int32)
         batch_size = self.BATCH_SIZE
@@ -91,9 +90,55 @@ class equalizer():
             print("output shape failed", sy_output.shape, sy_target.shape)
             sys.exit()
 
-            sy_error = sy_output - sy_target
-            sy_error = tf.reduce_mean(sy_error**2)
-            minimize = tf.train.AdamOptimizer().minimize(sy_error)
+        sy_error = sy_output - sy_target
+        sy_error = tf.reduce_mean(sy_error**2)
+        minimize = tf.train.AdamOptimizer().minimize(sy_error)
+
+        
+        ################################################################################
+        #
+        # COMPUTATIONAL GRAPH
+        ###############################################################################
+        print('training model')
+        #saver = tf.train.Saver()
+        with tf.Session() as sess:
+            init = tf.global_variables_initializer()
+            sess.run(init)
+
+            iter_error = []
+            for i in range(self.ITERATIONS):
+                batch = np.random.randint(0, int(.95*self.TOTAL_NUMBER_SEQUENCES), self.BATCH_SIZE)
+                
+                seq_error = []
+                for j in range(self.SEQUENCE_LENGTH-self.DELAY_LENGTH+1):
+                    input_batch = data[batch,:,:,j]
+                    target_batch = target[batch,j:j+1,:]
+
+                    feed_dict={sy_input: input_batch, sy_target: target_batch}
+
+                    _, error = sess.run([minimize, sy_error], feed_dict)
+                    seq_error.append(error)
+                
+                if ((i%self.PRINTEVERY) == 0): 
+                    print("It: %d | test err: %f" % (i, error))
+                iter_error.append(seq_error)
+    
+            # test!!
+            batch = list(range(int(.95*self.TOTAL_NUMBER_SEQUENCES), self.TOTAL_NUMBER_SEQUENCES))
+            val_error = []
+            for j in range(self.SEQUENCE_LENGTH-self.DELAY_LENGTH+1):
+                test_input = data[batch,:,:,j]
+                test_target = target[batch,j:j+1,:]
+
+                feed_dict={sy_input: test_input, sy_target: test_target}
+            
+                _, error = sess.run([minimize, sy_error], feed_dict)
+                val_error.append(error)
+                #print("Symbol: %d | validation err: %f" % (j, error))
+
+            # save model
+            #saver.save(sess, MODEL_FILE)
+        return iter_error, [val_error]
 
     ################################################################################
     # EXPERIMENT 
@@ -145,6 +190,7 @@ class equalizer():
 
             # break up sequence data into windowed views of sequence on new dimension 
             shape = (TOTAL_NUMBER_SEQUENCES, DELAY_LENGTH, 2, SEQUENCE_LENGTH - DELAY_LENGTH + 1)
+            print(data_delay.strides)
             strides = (*data_delay.strides, 2*data_delay.itemsize)
             data = as_strided(data_delay, shape, strides)
     
@@ -156,47 +202,7 @@ class equalizer():
 
             np.savez(open(self.DATA_FILE + ".npz", "wb"), data=data, target=target)
         return data, target
-
-    def train(self, data, target):
-        print('training model')
-        #saver = tf.train.Saver()
-        with tf.Session() as sess:
-            init = tf.global_variables_initializer()
-            sess.run(init)
-
-            iter_error = []
-            for i in range(self.ITERATIONS):
-                batch = np.random.randint(0, int(.95*self.TOTAL_NUMBER_SEQUENCES), self.BATCH_SIZE)
-                seq_error = []
-                for j in range(self.SEQUENCE_LENGTH-self.DELAY_LENGTH+1):
-                    input_batch = data[batch,:,:,j]
-                    target_batch = target[batch,j:j+1,:]
-
-                    feed_dict={sy_input: input_batch, sy_target: target_batch}
-
-                    _, error = sess.run([minimize, sy_error], feed_dict)
-                    seq_error.append(error)
-                    if ((i%self.PRINTEVERY) == 0): 
-                        print("It: %d | test err: %f" % (i, error))
-                    iter_error.append(seq_error)
-    
-            # test!!
-            batch = list(range(int(.95*self.TOTAL_NUMBER_SEQUENCES), self.TOTAL_NUMBER_SEQUENCES))
-            val_error = []
-            for j in range(self.SEQUENCE_LENGTH-self.DELAY_LENGTH+1):
-                test_input = data[batch,:,:,j]
-                test_target = target[batch,j:j+1,:]
-
-                feed_dict={sy_input: test_input, sy_target: test_target}
-            
-                _, error = sess.run([minimize, sy_error], feed_dict)
-                val_error.append(error)
-                #print("Symbol: %d | validation err: %f" % (j, error))
-
-            # save model
-            #saver.save(sess, MODEL_FILE)
-        return iter_error, val_error 
-
+                    
     def write_results(self, iter_error, val_error):
         # write configuration
         # with open(DATA_FILE + "_err.txt", "w") as err:
