@@ -19,7 +19,7 @@ from channel import Channel
 import util
 import multiprocessing
 import sys
-from random import randint, uniform
+from random import randint, uniform, sample
 import pprint
 import time
 import json
@@ -54,6 +54,11 @@ class System():
         self.agent_one = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_1/')
         self.agent_two = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_2/')
 
+        # Parameters to write in the plotted diagrams
+        p_args_names = 'run_id total_iters len_preamble stepsize lambda_p initial_logstd noise_power'.split()
+        p_args_params = [run_id, num_iterations, len_preamble, stepsize, lambda_p, initial_logstd, noise_power]
+        self.p_args = dict(zip(p_args_names, p_args_params)) 
+
         self.channel = Channel(noise_power)    
 
 
@@ -83,7 +88,7 @@ class System():
         adv = self.agent_one.transmitter_update(signal_b_g_g_1, i)
         # Visualize transmitter
         if (i % plot_every == 0):
-            self.agent_one.visualize(i)
+            self.agent_one.visualize(i, self.p_args)
         return adv
 
     """
@@ -163,12 +168,12 @@ def hyperparam_sweep(general_params, total):
                    n_hidden       = [40],
                    stepsize       = uniform(1e-4, 1e-2),
                    lambda_p       = uniform(1e-3, 1e-1),
-                   initial_logstd = uniform(-1.5,0),
+                   initial_logstd = uniform(-1.5,0.5),
                    k              = 3,
                    num_iterations = 2000,
-                   len_preamble   = 2**7,
+                   len_preamble   = 2**randint(7,9),
                    n_bits         = 4,
-                   noise_power    = uniform(0.05,0.5),
+                   noise_power    = 0.2,
                    **general_params)
 
         params.append(run)
@@ -198,12 +203,12 @@ if __name__ == '__main__':
     # Hyperparameters 
     params_single = dict(run_id = gen_id(),
                   n_hidden = [40],
-                  stepsize = 5e-3,
-                  lambda_p = .1,
-                  initial_logstd = 0.,
+                  stepsize = 5.17e-3,
+                  lambda_p = .0568,
+                  initial_logstd = 0.8161,
                   k = 3,
-                  num_iterations = 1,
-                  len_preamble = 2**9,
+                  num_iterations = 1000,
+                  len_preamble = 2**8,
                   n_bits = 4,
                   noise_power = 0.1,
                   **general_params)

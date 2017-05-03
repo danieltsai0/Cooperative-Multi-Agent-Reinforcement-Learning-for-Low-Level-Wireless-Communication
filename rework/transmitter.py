@@ -123,7 +123,7 @@ class NeuralTransmitter():
             }))   
         return np.squeeze(re), np.squeeze(im)
 
-    def visualize(self, iteration):
+    def visualize(self, iteration, p_args=None):
         start_time = time.time()
         """
         Plots a constellation diagram. (https://en.wikipedia.org/wiki/Constellation_diagram)
@@ -156,9 +156,19 @@ class NeuralTransmitter():
         scatter_data = 2*(np.random.randint(0,2,[size,self.n_bits])-.5)
         mod_scatter = self.transmit(scatter_data, save=False)
         ax.scatter(mod_scatter[:,0], mod_scatter[:,1], alpha=0.1, color="red")
-
         plt.xlim([-3, 3])
         plt.ylim([-3, 3])
+
+        # write arguments in graph for easy tuning
+        x_text = ax.get_xlim()[0]+0.3
+        y_text = ax.get_ylim()[1]-1.2
+       
+        p_args['iter'] = iteration 
+        param_text = '\n'.join([key+": "+ str(p_args[key]) for key in p_args.keys()])
+        ax.text(x_text, y_text, param_text,
+                fontsize=9,
+                bbox={'facecolor':'white', 'alpha':0.5})
+
         plt.savefig(self.im_dir % iteration)
         plt.close()
 

@@ -21,8 +21,8 @@ class Actor():
 
         return self.transmitter.policy_update(signal_b_g_g, stepsize)
 
-    def visualize(self, i):
-        self.transmitter.visualize(i)
+    def visualize(self, i, p_args):
+        self.transmitter.visualize(i, p_args)
 
     def receive(self, *args):
         signal_b = self.receiver.receive(*args)
