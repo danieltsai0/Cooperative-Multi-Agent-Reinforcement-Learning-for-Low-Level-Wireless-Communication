@@ -12,8 +12,8 @@ class Actor():
         util.create_dir(self.dirname)
 
 
-    def transmit(self, signal_b, restrict_energy):
-        signal_m = self.transmitter.transmit(signal_b, restrict_energy)
+    def transmit(self, signal_b):
+        signal_m = self.transmitter.transmit(signal_b)
         return signal_m
 
     def transmitter_update(self, signal_b_g_g, i):

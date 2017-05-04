@@ -49,7 +49,7 @@ class System():
     
         # Transmitter Parameters
         groundtruth = util.schemes[n_bits]
-        t_args = [self.preamble, groundtruth, n_bits, n_hidden, 
+        t_args = [self.preamble, restrict_energy, groundtruth, n_bits, n_hidden, 
                   lambda_p, initial_logstd]
         r_args = [self.preamble, k]
 
@@ -75,15 +75,15 @@ class System():
         # Compute signal_b here
         signal_b = self.preamble
         # Transmit bit signal, produce modulated signal
-        signal_m_1 = self.agent_one.transmit(signal_b, self.restrict_energy)
+        signal_m_1 = self.agent_one.transmit(signal_b)
         # Apply channel noise, produce noisy modulated signal
         signal_m_1 = self.channel.AWGN(signal_m_1) 
         # Receive mod signal, produce bit signal guess
         signal_b_g_2 = self.agent_two.receive(signal_m_1)
         # Transmit bit signal guess, 
         # produce mod signal and mod signal guess as tuple
-        signal_m_2 = self.agent_two.transmit(signal_b, self.restrict_energy)
-        signal_m_g_2 = self.agent_two.transmit(signal_b_g_2, self.restrict_energy)
+        signal_m_2 = self.agent_two.transmit(signal_b)
+        signal_m_g_2 = self.agent_two.transmit(signal_b_g_2)
         # Apply channel noise, produce noisy modulated signal
         signal_m_2, signal_m_g_2 = self.channel.AWGN(signal_m_2), self.channel.AWGN(signal_m_g_2)
         # Receive mod signal guess, produce bit signal guess of guess
@@ -211,7 +211,7 @@ if __name__ == '__main__':
                   n_hidden = [40],
                   stepsize = 5e-3,
                   lambda_p = 5e-2,
-                  initial_logstd = -1.5,
+                  initial_logstd = -2.0,
                   k = 3,
                   num_iterations = 2000,
                   len_preamble = 2**8,
