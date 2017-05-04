@@ -59,6 +59,8 @@ parser.add_argument("-ebn0", type=int, default=EBN0,
                            help="Eb/N0 value for single run [dB]")
 parser.add_argument("-iter", type=int, default=NUM_ITERATIONS,
                            help="number of iterations for k-means")
+parser.add_argument("-seed", type=int, default=0,
+                           help="seed for random generator")
 parser.add_argument("--dir", type=str, default='./out', 
                            help="directory/filename to save output to (./out)")
 parser.add_argument('--plot', action='store_true', help="show plots?")
@@ -75,7 +77,7 @@ TRAIN_LENGTH = args.train
 NUM_SAMPLES = args.samples
 RESOLUTION = args.res
 BASELINE = args.baseline
-EBN0 = 10**(args.ebn0/20)
+EBN0 = args.ebn0 
 NUM_ITERATIONS = args.iter
 
 def evaluate_baseline(test_data):
@@ -159,13 +161,11 @@ def do_random_experiment(EbN0):
 if (SWEEP): # sweep Eb/N0 values
 
     # generate data for all experiments
-    generator = Data_generator(0)
+    generator = Data_generator(args.seed)
     x_train_raw, x_train = generator.get_random_data(TRAIN_LENGTH, MODULATION)
     x_test_raw, x_test = generator.get_random_data(NUM_SAMPLES, MODULATION)
-    ebn0_values = np.logspace(-0.5, 0.5, RESOLUTION)
-
+    ebn0_values = np.linspace(0, 16, RESOLUTION)
     # generate sequence of Eb/N0 values
-    ebn0_values_dB = 20*np.log10(ebn0_values)
     bers = []
     print(MODULATION, " Train points: %d | Test points: %d" % (TRAIN_LENGTH, NUM_SAMPLES))
     print("Eb/N0 [dB], BER, num_clusters")
@@ -173,13 +173,15 @@ if (SWEEP): # sweep Eb/N0 values
     for EbN0 in ebn0_values: # do experiment for all Eb/N0 values
 
         # calculate N0 value to meet Eb/N0 requirement and add noise to sample
-        mean_Es = np.mean(np.abs(Data_generator().constellations[MODULATION][1]))
-        N0 = mean_Es/(EbN0*BITS_PER_SYMBOL)
+        mean_Es = np.mean(np.abs(Data_generator().constellations[MODULATION][1])**2)
+        EbN0_lin = 10**(0.1*EbN0)
+        N0 = mean_Es/(EbN0_lin*BITS_PER_SYMBOL)
         y_train = AWGN(x_train, N0)
         y_test = AWGN(x_test, N0)
         train_data = (x_train_raw, y_train)
         test_data = (x_test_raw, y_test) 
-
+        #plt.scatter(y_test.real, y_test.imag)
+        #plt.show()
         if (BASELINE): # evaluate baseline (standard demodulator)
             num_clusters_predicted = 0
             ber = evaluate_baseline(test_data)
@@ -187,21 +189,22 @@ if (SWEEP): # sweep Eb/N0 values
             distortion, means, assign, jump, num_clusters_predicted, ber = do_experiment(train_data, test_data)
 
         # print record and save ber
-        print("%f, %.10f, %d" % (20*np.log10(EbN0), ber, num_clusters_predicted))
+        print("%f, %.10f, %d" % (EbN0, ber, num_clusters_predicted))
         bers.append(ber)    
     
     bers = np.array(bers)
     bers_log = np.log10(bers)
 
-    # plot
-    fig = plt.figure()
-    plt.title('Bit-Error Rate (BER) of demodulation', fontsize=20)
-    ax = fig.add_subplot(111)
-    ax.plot(ebn0_values_dB, bers, "-bo")
-    ax.set(ylabel='BER', xlabel='$E_b/N_0$ (dB)')
-    ax.set_yscale('log')
-    ax.set_xlim([-10, 10])
-    plt.show()
+    if (SHOW): # if plotting is enabled:
+        # plot
+        fig = plt.figure()
+        plt.title('Bit-Error Rate (BER) of demodulation', fontsize=20)
+        ax = fig.add_subplot(111)
+        ax.plot(ebn0_values, bers, "-bo")
+        ax.set(ylabel='BER', xlabel='$E_b/N_0$ (dB)')
+        ax.set_yscale('log')
+        #ax.set_ylim([0, 1e-8])
+        plt.show(block=False)
 
 else: # run single experiment
 
@@ -213,13 +216,13 @@ else: # run single experiment
 
 if (SHOW): # if plotting is enabled:
 
-    if (SHOW_COVARIANCES): # calculate covariance matricies
+    if (SHOW_COVARIANCES and not SWEEP): # calculate covariance matricies
         covs = []
         for k in range(num_clusters_predicted): 
             y_normalized = np.array([(y[assign==k]-means[k]).real, (y[assign==k]-means[k]).imag]) 
             covs.append(np.cov(y_normalized, ddof=2))
 
-    if (SHOW_CONSTELLATION): 
+    if (SHOW_CONSTELLATION and not SWEEP): 
 
         # plot data in constellation diagram
         fig = plt.figure()
@@ -264,7 +267,7 @@ if (SHOW): # if plotting is enabled:
         ax.set_ylim([-1.5, 1.5])
        
 
-    if (SHOW_DISTURBANCE):
+    if (SHOW_DISTURBANCE and not SWEEP):
         fig = plt.figure()
         plt.title('Disturbance Analysis', fontsize=20)
         ax = fig.add_subplot(111)

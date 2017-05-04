@@ -16,8 +16,8 @@ def AWGN(samples, N0):
         OUTPUT:
             samples with added gaussian noise
     """
-    noise_re = np.random.normal(0, N0/2, samples.shape)
-    noise_im = np.random.normal(0, N0/2, samples.shape)
+    noise_re = np.random.normal(0, np.sqrt(N0/2), samples.shape)
+    noise_im = np.random.normal(0, np.sqrt(N0/2), samples.shape)
     
     return samples + (noise_re + 1j*noise_im) 
 

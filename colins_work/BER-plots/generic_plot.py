@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 import argparse
+from matplotlib2tikz import save as tikz_save
 
 ##################################################
 # parameters
@@ -96,7 +97,7 @@ plt.title(title, fontsize=BIGGER_SIZE)
 ax = fig.add_subplot(111)
 plt.show(block=False)
 
-ax.set_xlim([-10, 8])
+ax.set_xlim([0, 16])
 h, l = [], [] # legend handels
 
 
@@ -104,13 +105,18 @@ if (double_y): # draw second y axis
     ax2 = ax.twinx()
     ax2.set(ylabel='Number of Clusters')
     ax2.set_ylim([0, 25])
-    ax2.set_xlim([-10, 8])
+    ax2.set_xlim([0, 16])
 
-    for k,col in enumerate(data2):
-        if (k==0): continue
-        ax2.plot(data2[0], data2[k], color=colors.pop(), lw=3, label=labels2[k], alpha=1)
-    
+    for k in np.arange(1,len(data2),2):
+        color = colors.pop()
+        ax2.plot(data2[0], data2[k], color=color, label=labels2[k], lw=3)
+        ax2.fill_between(data2[0], data2[k]-data2[k+1]/2.0, data2[k]+data2[k+1]/2.0,
+        alpha=0.35, edgecolor=color, facecolor=color, lw=0)
+
     h2, l2 = ax2.get_legend_handles_labels()    
+
+else:
+    colors.pop()
 
 if (not args.num): # plot BER
     ax.set(ylabel='Bit-Error Rate (BER)', xlabel='$E_b/N_0$ [dB]')
@@ -121,9 +127,11 @@ else: # plot number of clusters
     ax.set_ylim([0, 25])
 
 
-for i,col in enumerate(data):
-    if (i==0): continue
-    ax.plot(data[0], data[i], color=colors.pop(), label=labels[i], lw=3)
+for i in np.arange(1,len(data),2):
+    color = colors.pop()
+    ax.plot(data[0], data[i], color=color, label=labels[i], lw=3)
+    ax.fill_between(data[0], data[i]-data[i+1]/2.0, data[i]+data[i+1]/2.0,
+    alpha=0.35, edgecolor=color, facecolor=color, lw=0)
 
 h1, l1 = ax.get_legend_handles_labels()    
 
@@ -135,4 +143,6 @@ else:
 ax.legend(h, l,loc=0)
 
 plt.draw()
+fig.savefig("output.png")
+tikz_save("output.tex", figureheight='2in', figurewidth='3.4in')
 plt.show()
