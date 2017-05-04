@@ -203,18 +203,18 @@ if __name__ == '__main__':
 
     # General params
     general_params = dict(plot_every = plot_every,
-                          restrict_energy = False 
+                          restrict_energy = True 
                      ) 
 
     # Hyperparameters 
     params_single = dict(run_id = gen_id(),
                   n_hidden = [40],
-                  stepsize = 2.45e-3,
-                  lambda_p = 9e-2,
-                  initial_logstd = -1.0,
+                  stepsize = 5e-3,
+                  lambda_p = 5e-2,
+                  initial_logstd = -1.5,
                   k = 3,
-                  num_iterations = 1000,
-                  len_preamble = 2**9,
+                  num_iterations = 2000,
+                  len_preamble = 2**8,
                   n_bits = 4,
                   noise_power = 0.1,
                   **general_params)

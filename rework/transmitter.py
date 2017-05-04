@@ -59,12 +59,19 @@ class NeuralTransmitter():
                 weights_initializer = util.normc_initializer(.5),
                 biases_initializer = tf.constant_initializer(0.0)
         ))
-
+        
+        # new shit
+        self.max_amplitude = tf.sqrt(tf.reduce_max(self.re_mean**2 + self.im_mean**2))
+        self.normalization = tf.nn.relu(self.max_amplitude-1)+1.0  
+        self.re_mean /= self.normalization
+        self.im_mean /= self.normalization 
+        
+        self.randomshit = self.re_mean + self.im_mean 
         self.re_logstd = tf.Variable(initial_logstd)
         self.im_logstd = tf.Variable(initial_logstd)
         self.re_std = tf.exp(self.re_logstd)
         self.im_std = tf.exp(self.im_logstd)
-
+        
         # randomized actions
         self.re_distr = tf.contrib.distributions.Normal(self.re_mean, self.re_std)
         self.im_distr = tf.contrib.distributions.Normal(self.im_mean, self.im_std)
@@ -99,7 +106,6 @@ class NeuralTransmitter():
         return np.average(adv)
 
     def transmit(self, signal_b, restrict_energy=False, save=True):
-
         re, im, rel, iml, re_mean, im_mean = self.sess.run([self.re_sample, self.im_sample, 
                                                             self.re_logstd, self.im_logstd,
                                                             self.re_mean, self.im_mean],
@@ -110,27 +116,22 @@ class NeuralTransmitter():
         # print("rel:",np.exp(rel))
         # print("iml:",np.exp(iml))
    
-        # in enabled, restrict means to unit circle 
-        if (restrict_energy):
-            max_amplitude = np.max(np.sqrt(re_mean**2 + im_mean**2))
-            re /= max_amplitude
-            im /= max_amplitude
-    
         if save:
             self.input_accum = signal_b
             self.actions_re_accum = np.squeeze(re)
             self.actions_im_accum = np.squeeze(im)
-        signal_m = np.array([np.squeeze(re),np.squeeze(im)]).T
-        return signal_m 
 
+        signal_m = np.array([np.squeeze(re),np.squeeze(im)]).T
+        
+        return signal_m
 
     def evaluate(self, signal_b):
         # run policy
-        re, im = np.squeeze(self.sess.run([self.re_mean, self.im_mean], feed_dict={
+        _, re, im = np.squeeze(self.sess.run([self.randomshit, self.re_mean, self.im_mean], feed_dict={
                 self.input: signal_b,
                 self.batch_size: signal_b.shape[0]
             }))   
-        return np.squeeze(re), np.squeeze(im)
+        return np.array([np.squeeze(re),np.squeeze(im)]).T
 
     def visualize(self, iteration, p_args=None):
         start_time = time.time()
@@ -143,28 +144,26 @@ class NeuralTransmitter():
         plt.title('Constellation Diagram', fontsize=20)
         ax = fig.add_subplot(111)
         ax.set(ylabel='imaginary part', xlabel='real part')
-        bitstrings = list(itertools.product([-1, 1], repeat=self.n_bits))
-        for bs in bitstrings:
-            x,y = self.evaluate(np.array(bs)[None])
-            label = (np.array(bs)+1)/2
-            ax.scatter(x, y, label=str(label), color='purple', marker="d")
-            ax.annotate(str(label), (x, y), size=10)
-        ax.axvline(0, color='grey')
-        ax.axhline(0, color='grey')
+        bitstrings = list(itertools.product([-1., 1.], repeat=self.n_bits))
         #ax.grid()
     
-        if self.groundtruth:
-            for k in self.groundtruth.keys():
-                re_gt, im_gt = self.groundtruth[k]
-                ax.scatter(re_gt, im_gt, s=5, color='purple')
-                # ax.annotate(''.join([str(b) for b in k]), (re_gt, im_gt), size=5)
-        
-        
         # plot modulated preamble
-        size = 10000
-        scatter_data = 2*(np.random.randint(0,2,[size,self.n_bits])-.5)
-        mod_scatter = self.transmit(scatter_data, restrict_energy=p_args['restrict_energy'], save=False)
+        size = 10000 
+        scatter_data = 2.0*(np.random.randint(0,2,[size,self.n_bits])-.5)
+        mod_scatter =  self.transmit(scatter_data, restrict_energy=p_args['restrict_energy'], save=False)
+        eval_out = self.evaluate(np.array(bitstrings))
+
         ax.scatter(mod_scatter[:,0], mod_scatter[:,1], alpha=0.1, color="red")
+
+        for i,bs in enumerate(bitstrings):
+            x,y = eval_out[i,0], eval_out[i,1] 
+            label = (np.array(bs)+1)/2
+            ax.scatter(x, y, color='purple', marker="d")
+            ax.annotate(str(label), (x, y), size=10)
+
+
+        ax.axvline(0, color='grey')
+        ax.axhline(0, color='grey')
         if (p_args['restrict_energy']):
             plt.xlim([-1.5, 1.5])
             plt.ylim([-1.5, 1.5])
@@ -195,8 +194,8 @@ class NeuralTransmitter():
         # return np.linalg.norm(self.preamble - signal_b_g_g, ord=1, axis=1) + \
         #             self.lambda_p*np.sum(self.preamble_mod**2,axis=1)
         return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1) + \
-                    self.lambda_p*(self.actions_re_accum**2 + self.actions_im_accum**2) + \
-                    self.lambda_p*np.average(self.actions_re_accum**2 + self.actions_im_accum**2)
+                    self.lambda_p*np.average(self.actions_re_accum**2 + self.actions_im_accum**2) + \
+                    self.lambda_p*(self.actions_re_accum**2 + self.actions_im_accum**2)
 
     #####################
     # Methods for stats #
