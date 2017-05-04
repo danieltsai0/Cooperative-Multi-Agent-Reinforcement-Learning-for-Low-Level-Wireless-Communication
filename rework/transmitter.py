@@ -123,8 +123,6 @@ class NeuralTransmitter():
 
         signal_m = np.array([np.squeeze(re),np.squeeze(im)]).T
         
-        if signal_b.shape[0]>600:
-            return signal_m, re_mean, im_mean
         return signal_m
 
     def evaluate(self, signal_b):
@@ -133,7 +131,7 @@ class NeuralTransmitter():
                 self.input: signal_b,
                 self.batch_size: signal_b.shape[0]
             }))   
-        return np.squeeze(re), np.squeeze(im)
+        return np.array([np.squeeze(re),np.squeeze(im)]).T
 
     def visualize(self, iteration, p_args=None):
         start_time = time.time()
@@ -147,33 +145,25 @@ class NeuralTransmitter():
         ax = fig.add_subplot(111)
         ax.set(ylabel='imaginary part', xlabel='real part')
         bitstrings = list(itertools.product([-1., 1.], repeat=self.n_bits))
-        for bs in bitstrings:
-            x,y = self.evaluate(np.array(bs)[None])
-            label = (np.array(bs)+1)/2
-            ax.scatter(x, y, label=str(label), color='purple', marker="d")
-            ax.annotate(str(label), (x, y), size=10)
-        ax.axvline(0, color='grey')
-        ax.axhline(0, color='grey')
         #ax.grid()
     
-        if self.groundtruth:
-            for k in self.groundtruth.keys():
-                re_gt, im_gt = self.groundtruth[k]
-                ax.scatter(re_gt, im_gt, s=5, color='purple')
-                # ax.annotate(''.join([str(b) for b in k]), (re_gt, im_gt), size=5)
-        
-        
         # plot modulated preamble
-        size = 10000
-        scatter_data = 2*(np.random.randint(0,2,[size,self.n_bits])-.5)
-        mod_scatter, re_mean, im_mean = self.transmit(scatter_data, restrict_energy=p_args['restrict_energy'], save=False)
-        eval_out = self.evaluate(scatter_data)
-
-        print mod_scatter[:20,:]
-        print eval_out[:20]
+        size = 10000 
+        scatter_data = 2.0*(np.random.randint(0,2,[size,self.n_bits])-.5)
+        mod_scatter =  self.transmit(scatter_data, restrict_energy=p_args['restrict_energy'], save=False)
+        eval_out = self.evaluate(np.array(bitstrings))
 
         ax.scatter(mod_scatter[:,0], mod_scatter[:,1], alpha=0.1, color="red")
-        ax.scatter(re_mean, im_mean, color="blue")
+
+        for i,bs in enumerate(bitstrings):
+            x,y = eval_out[i,0], eval_out[i,1] 
+            label = (np.array(bs)+1)/2
+            ax.scatter(x, y, color='purple', marker="d")
+            ax.annotate(str(label), (x, y), size=10)
+
+
+        ax.axvline(0, color='grey')
+        ax.axhline(0, color='grey')
         if (p_args['restrict_energy']):
             plt.xlim([-1.5, 1.5])
             plt.ylim([-1.5, 1.5])
