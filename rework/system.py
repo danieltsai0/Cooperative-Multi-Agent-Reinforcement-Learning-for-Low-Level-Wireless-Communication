@@ -13,6 +13,7 @@
 #
 ################################################################################
 
+import tensorflow as tf
 import numpy as np
 import actor
 from channel import Channel
@@ -30,6 +31,7 @@ class System():
     def __init__(self,
                  run_id,
                  plot_every, 
+                 restrict_energy,
                  num_iterations, 
                  len_preamble, 
                  n_bits, 
@@ -43,7 +45,8 @@ class System():
         # System Parameters
         self.num_iterations = num_iterations
         self.preamble = util.generate_preamble(len_preamble, n_bits)
-
+        self.restrict_energy  = restrict_energy
+    
         # Transmitter Parameters
         groundtruth = util.schemes[n_bits]
         t_args = [self.preamble, groundtruth, n_bits, n_hidden, 
@@ -55,8 +58,8 @@ class System():
         self.agent_two = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_2/')
 
         # Parameters to write in the plotted diagrams
-        p_args_names = 'run_id total_iters len_preamble stepsize lambda_p initial_logstd noise_power'.split()
-        p_args_params = [run_id, num_iterations, len_preamble, stepsize, lambda_p, initial_logstd, noise_power]
+        p_args_names = 'run_id total_iters len_preamble stepsize lambda_p initial_logstd noise_power restrict_energy'.split()
+        p_args_params = [run_id, num_iterations, len_preamble, stepsize, lambda_p, initial_logstd, noise_power, restrict_energy]
         self.p_args = dict(zip(p_args_names, p_args_params)) 
 
         self.channel = Channel(noise_power)    
@@ -72,14 +75,15 @@ class System():
         # Compute signal_b here
         signal_b = self.preamble
         # Transmit bit signal, produce modulated signal
-        signal_m_1 = self.agent_one.transmit(signal_b)
+        signal_m_1 = self.agent_one.transmit(signal_b, self.restrict_energy)
         # Apply channel noise, produce noisy modulated signal
         signal_m_1 = self.channel.AWGN(signal_m_1) 
         # Receive mod signal, produce bit signal guess
         signal_b_g_2 = self.agent_two.receive(signal_m_1)
         # Transmit bit signal guess, 
         # produce mod signal and mod signal guess as tuple
-        signal_m_2, signal_m_g_2 = self.agent_two.transmit(signal_b), self.agent_two.transmit(signal_b_g_2)
+        signal_m_2 = self.agent_two.transmit(signal_b, self.restrict_energy)
+        signal_m_g_2 = self.agent_two.transmit(signal_b_g_2, self.restrict_energy)
         # Apply channel noise, produce noisy modulated signal
         signal_m_2, signal_m_g_2 = self.channel.AWGN(signal_m_2), self.channel.AWGN(signal_m_g_2)
         # Receive mod signal guess, produce bit signal guess of guess
@@ -168,7 +172,7 @@ def hyperparam_sweep(general_params, total):
                    n_hidden       = [40],
                    stepsize       = uniform(1e-4, 1e-2),
                    lambda_p       = uniform(1e-3, 1e-1),
-                   initial_logstd = uniform(-1.5,0.5),
+                   initial_logstd = uniform(-1.5,1),
                    k              = 3,
                    num_iterations = 2000,
                    len_preamble   = 2**randint(7,9),
@@ -184,6 +188,7 @@ if __name__ == '__main__':
 
     iterations = multiprocessing.Value('i', 0)
     np.random.seed(0)
+    tf.set_random_seed(1)
     output_dir = "output/"
     discard_dir = output_dir+"shitty/" # runs that don't meet the loss threshold
     preview_dir = output_dir+"preview/" # folder for all final constellations
@@ -198,17 +203,18 @@ if __name__ == '__main__':
 
     # General params
     general_params = dict(plot_every = plot_every,
+                          restrict_energy = False 
                      ) 
 
     # Hyperparameters 
     params_single = dict(run_id = gen_id(),
                   n_hidden = [40],
-                  stepsize = 5.17e-3,
-                  lambda_p = .0568,
-                  initial_logstd = 0.8161,
+                  stepsize = 2.45e-3,
+                  lambda_p = 9e-2,
+                  initial_logstd = -1.0,
                   k = 3,
                   num_iterations = 1000,
-                  len_preamble = 2**8,
+                  len_preamble = 2**9,
                   n_bits = 4,
                   noise_power = 0.1,
                   **general_params)
@@ -217,7 +223,7 @@ if __name__ == '__main__':
 
     #############
     # SWITCH
-    run_sweep = True 
+    run_sweep = False 
 
     ##############   
     # SINGLE RUN

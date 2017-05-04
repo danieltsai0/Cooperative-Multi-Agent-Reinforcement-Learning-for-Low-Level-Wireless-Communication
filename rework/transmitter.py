@@ -39,8 +39,8 @@ class NeuralTransmitter():
                 inputs = layers[-1],
                 num_outputs = num,
                 activation_fn = tf.nn.relu, # relu activation for hidden layer
-                weights_initializer = util.normc_initializer(1.0),
-                biases_initializer = tf.constant_initializer(.1)
+                weights_initializer = util.normc_initializer(0.2),
+                biases_initializer = tf.constant_initializer(0.2)
             )
             layers.append(h)
 
@@ -48,7 +48,7 @@ class NeuralTransmitter():
                 inputs = layers[-1],
                 num_outputs = 1,
                 activation_fn = None,
-                weights_initializer = util.normc_initializer(.2),
+                weights_initializer = util.normc_initializer(.5),
                 biases_initializer = tf.constant_initializer(0.0)
         ))
 
@@ -56,7 +56,7 @@ class NeuralTransmitter():
                 inputs = layers[-1],
                 num_outputs = 1,
                 activation_fn = None,
-                weights_initializer = util.normc_initializer(.2),
+                weights_initializer = util.normc_initializer(.5),
                 biases_initializer = tf.constant_initializer(0.0)
         ))
 
@@ -98,19 +98,28 @@ class NeuralTransmitter():
         
         return np.average(adv)
 
-    def transmit(self, signal_b, save=True):
+    def transmit(self, signal_b, restrict_energy=False, save=True):
 
-        re, im, rel, iml = self.sess.run([self.re_sample, self.im_sample, self.re_logstd, self.im_logstd], feed_dict={
+        re, im, rel, iml, re_mean, im_mean = self.sess.run([self.re_sample, self.im_sample, 
+                                                            self.re_logstd, self.im_logstd,
+                                                            self.re_mean, self.im_mean],
+                                                            feed_dict={
                 self.input: signal_b,
                 self.batch_size: signal_b.shape[0]
             })
         # print("rel:",np.exp(rel))
         # print("iml:",np.exp(iml))
+   
+        # in enabled, restrict means to unit circle 
+        if (restrict_energy):
+            max_amplitude = np.max(np.sqrt(re_mean**2 + im_mean**2))
+            re /= max_amplitude
+            im /= max_amplitude
+    
         if save:
             self.input_accum = signal_b
             self.actions_re_accum = np.squeeze(re)
             self.actions_im_accum = np.squeeze(im)
-
         signal_m = np.array([np.squeeze(re),np.squeeze(im)]).T
         return signal_m 
 
@@ -154,14 +163,23 @@ class NeuralTransmitter():
         # plot modulated preamble
         size = 10000
         scatter_data = 2*(np.random.randint(0,2,[size,self.n_bits])-.5)
-        mod_scatter = self.transmit(scatter_data, save=False)
+        mod_scatter = self.transmit(scatter_data, restrict_energy=p_args['restrict_energy'], save=False)
         ax.scatter(mod_scatter[:,0], mod_scatter[:,1], alpha=0.1, color="red")
-        plt.xlim([-3, 3])
-        plt.ylim([-3, 3])
+        if (p_args['restrict_energy']):
+            plt.xlim([-1.5, 1.5])
+            plt.ylim([-1.5, 1.5])
+            # write arguments in graph for easy tuning
+            x_text = ax.get_xlim()[0]+0.1
+            y_text = ax.get_ylim()[1]-0.5
+            unit_circle = plt.Circle((0,0), 1, color='grey', fill=False)
+            ax.add_artist(unit_circle)                
 
-        # write arguments in graph for easy tuning
-        x_text = ax.get_xlim()[0]+0.3
-        y_text = ax.get_ylim()[1]-1.2
+        else:   
+            plt.xlim([-3, 3])
+            plt.ylim([-3, 3])
+            # write arguments in graph for easy tuning
+            x_text = ax.get_xlim()[0]+0.3
+            y_text = ax.get_ylim()[1]-1.4
        
         p_args['iter'] = iteration 
         param_text = '\n'.join([key+": "+ str(p_args[key]) for key in p_args.keys()])
