@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import scipy.signal as signal
 import sys
+import getopt
+import plot_equalizer
 from numpy.lib.stride_tricks import as_strided
 from Data_generator import Data_generator
 
@@ -18,38 +20,44 @@ from Data_generator import Data_generator
 ################################################################################
 
 class equalizer():
-    def __init__(self):
-        self.config()
+    def __init__(self, 
+                 CONSTELLATION='8psk',
+                 DELAY_LENGTH=5,
+                 TOTAL_NUMBER_SEQUENCES=1000,
+                 BATCH_SIZE=50, 
+                 HIDDEN_DIM=20,
+                 NUM_LAYERS=2,
+                 ITERATIONS=400,
+                 LEARNING_RATE=1e-6):
+        
+        #######################################################################
+        # CONFIGURATION
+        self.ITERATIONS = ITERATIONS
+        self.LEARNING_RATE = LEARNING_RATE
+
+        self.SEQUENCE_LENGTH = 100 # number of symbols per sequence
+        self.TOTAL_NUMBER_SEQUENCES = TOTAL_NUMBER_SEQUENCES # total number of sequences in datapool
+        self.BATCH_SIZE = BATCH_SIZE
+        self.HIDDEN_DIM = HIDDEN_DIM
+        self.NUM_LAYERS = NUM_LAYERS # number of layers in the LSTM
+        self.OUTPUT_DIM = 2 # defines maximum number of output bits
+        self.DELAY_LENGTH = DELAY_LENGTH
+        self.CONSTELLATION = CONSTELLATION
+        self.DATA_FILE = 'equalizer_results/' + CONSTELLATION + '_' + str(DELAY_LENGTH)
+        self.MODEL_FILE = 'equalizer_models/' + CONSTELLATION + '_' + str(DELAY_LENGTH)
+        self.PRINTEVERY = 50 # how often the training error is reported
+        self.plot = plot_equalizer.plot()
+
+
     def run(self):
         data, target = self.build_experiment(self.SEQUENCE_LENGTH,
                                              self.TOTAL_NUMBER_SEQUENCES,
                                              self.CONSTELLATION,
                                              self.DELAY_LENGTH)
         iter_error, val_error = self.build_graph(data, target)
+        self.plot_results()
         self.write_results(iter_error, val_error)
-
-    ################################################################################
-    # CONFIGURATION
-    def config(self,
-               CONSTELLATION='8psk',
-               DELAY_LENGTH=5,
-               BATCH_SIZE=50, 
-               DATA_FILE='equalizer_results/8psk_5', 
-               MODEL_FILE=''):
-        self.ITERATIONS = 400
-        self.LEARNING_RATE = 1e-6
-
-        self.SEQUENCE_LENGTH = 100 # number of symbols per sequence
-        self.TOTAL_NUMBER_SEQUENCES = 1000 # total number of sequences in datapool
-        self.BATCH_SIZE = BATCH_SIZE
-        self.HIDDEN_DIM = 20
-        self.NUM_LAYERS = 2 # number of layers in the LSTM
-        self.OUTPUT_DIM = 2 # defines maximum number of output bits
-        self.DELAY_LENGTH = DELAY_LENGTH
-        self.CONSTELLATION = CONSTELLATION
-        self.DATA_FILE = DATA_FILE
-        self.MODEL_FILE = MODEL_FILE
-        self.PRINTEVERY = 50 # how often the training error is reported
+      
 
     ################################################################################
     #
@@ -93,7 +101,6 @@ class equalizer():
         sy_error = sy_output - sy_target
         sy_error = tf.reduce_mean(sy_error**2)
         minimize = tf.train.AdamOptimizer().minimize(sy_error)
-
         
         ################################################################################
         #
@@ -102,6 +109,7 @@ class equalizer():
         print('training model')
         #saver = tf.train.Saver()
         with tf.Session() as sess:
+            sess.as_default()
             init = tf.global_variables_initializer()
             sess.run(init)
 
@@ -125,22 +133,25 @@ class equalizer():
     
             # test!!
             batch = list(range(int(.95*self.TOTAL_NUMBER_SEQUENCES), self.TOTAL_NUMBER_SEQUENCES))
-            val_error = []
+            val_error, val_output = [], []
             for j in range(self.SEQUENCE_LENGTH-self.DELAY_LENGTH+1):
                 test_input = data[batch,:,:,j]
                 test_target = target[batch,j:j+1,:]
 
                 feed_dict={sy_input: test_input, sy_target: test_target}
             
-                _, error = sess.run([minimize, sy_error], feed_dict)
+                error, output = sess.run([sy_error, sy_output], feed_dict)
                 val_error.append(error)
+                val_output.append(output)
                 #print("Symbol: %d | validation err: %f" % (j, error))
 
+            self.plot.set_output(np.hstack(val_output))
+            
             # save model
             #saver.save(sess, MODEL_FILE)
         return iter_error, [val_error]
-
-    ################################################################################
+        
+    ###########################################################################
     # EXPERIMENT 
     def build_experiment(self, 
                          SEQUENCE_LENGTH, 
@@ -151,6 +162,9 @@ class equalizer():
         try:
             npz = np.load(open(self.DATA_FILE + ".npz", "rb"))
             data, target = npz['data'], npz['target']
+            # self.plot.set_channel(DELAY)
+            # self.plot.set_transmitted(data_delay[int(TOTAL_NUMBER_SEQUENCES*.95):, :, :])
+            # self.plot.set_target(target[int(TOTAL_NUMBER_SEQUENCES*.95):, :, :])
             print('Loading data')
             npz.close()
 
@@ -168,7 +182,7 @@ class equalizer():
             # create training data
             DELAY = np.random.normal(0, 1/np.sqrt(2), (2, DELAY_LENGTH))
             DELAY = np.array([[complex(x, y) for (x, y) in zip(DELAY[0,:], DELAY[1,:])]])
-
+            
             try:
                 assert(DELAY_LENGTH == DELAY.shape[1])
             except:
@@ -187,6 +201,12 @@ class equalizer():
             except:
                 print("Test 2 failed", data_delay.shape, [TOTAL_NUMBER_SEQUENCES, SEQUENCE_LENGTH, 2])
                 sys.exit()
+
+            # store channel and validation set for plotting
+            self.plot.set_channel(DELAY)
+            self.plot.set_transmitted(data_delay[int(TOTAL_NUMBER_SEQUENCES*.95):, :, :])
+            self.plot.set_target(target[int(TOTAL_NUMBER_SEQUENCES*.95):, :, :])
+            
 
             # break up sequence data into windowed views of sequence on new dimension 
             shape = (TOTAL_NUMBER_SEQUENCES, DELAY_LENGTH, 2, SEQUENCE_LENGTH - DELAY_LENGTH + 1)
@@ -208,10 +228,69 @@ class equalizer():
         # with open(DATA_FILE + "_err.txt", "w") as err:
         #     err.write("Delay length: {}\n".format(DELAY_LENGTH))
         # write sequence errors
+        print("writing results")
         with open(self.DATA_FILE + "_err.txt", "wb") as err:
             np.savetxt(err, iter_error, fmt='%.6f', delimiter=' ')
             np.savetxt(err, val_error, fmt='%.6f', delimiter=' ')
 
+    def plot_results(self):
+        print('plotting results')
+        self.plot.plot_val(self.DATA_FILE + '.png')
+
+def usage():
+    print("c : constellation type\n" + 
+          "d : delay length\n" + 
+          "s : total number of sequences (not implemented)\n" +
+          "b : batch size\n" +
+          "l : hidden dimension size\n" + 
+          "i : training iterations\n" +
+          "r : learning rate\n" + 
+          "f : parameter configuration file name (overrides other args)")
+    
 if __name__ == "__main__":
-    equal = equalizer()
+    CONSTELLATION='8psk'
+    DELAY_LENGTH=5
+    TOTAL_NUMBER_SEQUENCES=1000
+    BATCH_SIZE=50
+    HIDDEN_DIM=20
+    NUM_LAYERS=2
+    ITERATIONS=400
+    LEARNING_RATE=1e-6
+
+    if len(sys.argv) > 1: # has arguments
+        # parse flags
+        try:
+            opts, args = getopt.getopt(sys.argv, "c:d:s:b:l:i:r:f:")
+        except:
+            usage()
+            sys.exit(-1)
+
+        args = args[1:]
+        args.reverse()
+        while(args):
+            opt = args.pop()
+            if opt == '-c':
+                CONSTELLATION=args.pop()
+            if opt == '-d':
+                DELAY_LENGTH=int(args.pop())
+            # if opt == '-s':
+            #     TOTAL_NUMBER_SEQUENCES=arg
+            if opt == '-b':
+                BATCH_SIZE=int(args.pop())
+            if opt == '-l':
+                NUM_LAYERS=int(args.pop())
+            if opt == '-i':
+                ITERATIONS=int(args.pop())
+            if opt == '-r':
+                LEARNING_RATE=float(args.pop())
+
+    # create and run model
+    equal = equalizer(CONSTELLATION,
+                      DELAY_LENGTH,
+                      TOTAL_NUMBER_SEQUENCES,
+                      BATCH_SIZE, 
+                      HIDDEN_DIM,
+                      NUM_LAYERS,
+                      ITERATIONS,
+                      LEARNING_RATE)
     equal.run()
