@@ -13,7 +13,7 @@ class Channel():
 
     def AWGN(self, signal):
         noise = np.random.normal(loc=0.0, 
-                     scale=self.noise_power/2.0,
+                     scale=np.sqrt(self.noise_power/2.0),
                      size=signal.shape)
 
         return signal + noise

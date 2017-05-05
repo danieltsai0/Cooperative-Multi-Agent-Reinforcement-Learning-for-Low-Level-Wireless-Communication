@@ -209,14 +209,14 @@ if __name__ == '__main__':
     # Hyperparameters 
     params_single = dict(run_id = gen_id(),
                   n_hidden = [40],
-                  stepsize = 5e-3,
-                  lambda_p = 5e-2,
+                  stepsize = 2e-3,
+                  lambda_p = 9e-2,
                   initial_logstd = -2.0,
                   k = 3,
                   num_iterations = 2000,
-                  len_preamble = 2**8,
+                  len_preamble = 2**9,
                   n_bits = 4,
-                  noise_power = 0.1,
+                  noise_power = 0.04,
                   **general_params)
     
     params_sweep = hyperparam_sweep(general_params, 1000)

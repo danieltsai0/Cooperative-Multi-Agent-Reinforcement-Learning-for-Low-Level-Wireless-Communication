@@ -148,12 +148,15 @@ class NeuralTransmitter():
         # plot means and labels
         bitstrings = list(itertools.product([-1., 1.], repeat=self.n_bits))
         eval_data = self.evaluate(np.array(bitstrings))
+        Eb = np.mean(eval_data[:,0]**2 + eval_data[:,1]**2)/float(self.n_bits)        
 
         for i,bs in enumerate(bitstrings):
             x,y = eval_data[i,0], eval_data[i,1] 
             label = (np.array(bs)+1)/2
             ax.scatter(x, y, label=str(label), color='purple', marker="d")
             ax.annotate(str(label), (x, y), size=10)
+            noise_circle = plt.Circle((x,y), np.sqrt(p_args['noise_power']), color='purple', fill=False)
+            ax.add_artist(noise_circle)                
 
         ax.axvline(0, color='grey')
         ax.axhline(0, color='grey')
@@ -179,8 +182,8 @@ class NeuralTransmitter():
             # write arguments in graph for easy tuning
             x_text = ax.get_xlim()[0]+0.3
             y_text = ax.get_ylim()[1]-1.4
-       
-        p_args['iter'] = iteration 
+        
+        p_args['$E_b/N_0$'] = 10*np.log10(Eb/p_args['noise_power'])
         param_text = '\n'.join([key+": "+ str(p_args[key]) for key in p_args.keys()])
         ax.text(x_text, y_text, param_text,
                 fontsize=9,
@@ -190,9 +193,12 @@ class NeuralTransmitter():
         plt.close()
 
     def lasso_loss(self, signal_b_g_g):
-        # return np.linalg.norm(self.preamble - signal_b_g_g, ord=1, axis=1) + \
-        #             self.lambda_p*np.sum(self.preamble_mod**2,axis=1)
-        return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1) + \
+        if (self.restrict_energy):
+            return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1)
+
+        # if the energy is unrestricted during training 
+        else: 
+            return np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1) + \
                     self.lambda_p*np.average(self.actions_re_accum**2 + self.actions_im_accum**2) + \
                     self.lambda_p*(self.actions_re_accum**2 + self.actions_im_accum**2)
 
