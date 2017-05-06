@@ -14,7 +14,7 @@ class NeuralTransmitter():
                  n_hidden = [32, 20],
                  lambda_p = 0.1,
                  initial_logstd = -2.,
-                 im_dir = None
+                 dirname = None
                  ):
 
         # Network variables
@@ -23,8 +23,9 @@ class NeuralTransmitter():
         self.lambda_p = lambda_p
         self.n_bits = n_bits
         self.groundtruth = groundtruth
-        self.im_dir = im_dir
-        self.im_dir += '%04d.png'
+        self.dirname = dirname
+        self.im_dir = dirname + '%04d.png'
+        self.ber_fn = dirname + 'ber.txt'
 
         # Placeholders for training
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
@@ -107,6 +108,7 @@ class NeuralTransmitter():
         
         return np.average(adv)
 
+
     def transmit(self, signal_b, save=True):
         re, im  = self.sess.run([self.re_sample, self.im_sample], feed_dict={
                 self.input: signal_b,
@@ -121,6 +123,7 @@ class NeuralTransmitter():
         signal_m = np.array([np.squeeze(re),np.squeeze(im)]).T
         return signal_m
 
+
     def evaluate(self, signal_b):
         # run policy
         re, im = np.squeeze(self.sess.run([self.re_mean, self.im_mean], feed_dict={
@@ -128,6 +131,7 @@ class NeuralTransmitter():
                 self.batch_size: signal_b.shape[0]
             }))   
         return np.array([np.squeeze(re),np.squeeze(im)]).T
+
 
     def visualize(self, iteration, p_args=None):
         """
@@ -191,6 +195,13 @@ class NeuralTransmitter():
 
         plt.savefig(self.im_dir % iteration)
         plt.close()
+
+
+    def save_ber(self, signal_b_g_g):
+        ber = np.sum(np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1)/2)
+        with open(self.ber_fn, 'a') as f:
+            f.write(str(ber) + "\n")
+
 
     def lasso_loss(self, signal_b_g_g):
         if (self.restrict_energy):

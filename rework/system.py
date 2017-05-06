@@ -88,6 +88,8 @@ class System():
         signal_m_2, signal_m_g_2 = self.channel.AWGN(signal_m_2), self.channel.AWGN(signal_m_g_2)
         # Receive mod signal guess, produce bit signal guess of guess
         signal_b_g_g_1 = self.agent_one.receive(signal_m_2, signal_m_g_2)
+        # Save BER of transmitter one
+        self.agent_one.save_ber(signal_b_g_g_1)
         # Update transmitter with bit signal guess of guess
         adv = self.agent_one.transmitter_update(signal_b_g_g_1, i)
         # Visualize transmitter
@@ -187,8 +189,8 @@ def hyperparam_sweep(general_params, total):
 if __name__ == '__main__':
 
     iterations = multiprocessing.Value('i', 0)
-    np.random.seed(0)
-    tf.set_random_seed(1)
+    np.random.seed(4)
+    tf.set_random_seed(5)
     output_dir = "output/"
     discard_dir = output_dir+"shitty/" # runs that don't meet the loss threshold
     preview_dir = output_dir+"preview/" # folder for all final constellations
@@ -203,17 +205,30 @@ if __name__ == '__main__':
 
     # General params
     general_params = dict(plot_every = plot_every,
-                          restrict_energy = True 
+                          restrict_energy = False 
                      ) 
 
-    # Hyperparameters 
+    # # Hyperparameters for restricted
+    # params_single = dict(run_id = gen_id(),
+    #               n_hidden = [40],
+    #               stepsize = 4e-3,
+    #               lambda_p = 0,
+    #               initial_logstd = -2.0,
+    #               k = 3,
+    #               num_iterations = 1000,
+    #               len_preamble = 2**8,
+    #               n_bits = 4,
+    #               noise_power = 0.1,
+    #               **general_params)
+
+    # Hyperparameters for unrestricted
     params_single = dict(run_id = gen_id(),
                   n_hidden = [40],
-                  stepsize = 2e-3,
+                  stepsize = 2.45e-3,
                   lambda_p = 9e-2,
-                  initial_logstd = -2.0,
+                  initial_logstd = -1.0,
                   k = 3,
-                  num_iterations = 2000,
+                  num_iterations = 1000,
                   len_preamble = 2**9,
                   n_bits = 4,
                   noise_power = 0.04,

@@ -38,3 +38,6 @@ class Actor():
         # Dump centroid dictionary
         with open(self.dirname+'centroid.pickle', 'wb') as output_file:
             pickle.dump(centroid_dict, output_file)
+
+    def save_ber(self, signal_b_g_g):
+        self.transmitter.save_ber(signal_b_g_g)

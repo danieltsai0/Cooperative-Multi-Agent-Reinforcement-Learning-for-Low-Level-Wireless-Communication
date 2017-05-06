@@ -8,6 +8,8 @@
 
 import numpy as np
 import tensorflow as tf
+import scipy.spatial.distance as distance
+import time
 import os
 
 ############################################################
@@ -209,33 +211,55 @@ def create_dir(dirname):
         os.makedirs(dirname)
 
 
-def mode_rows(a):
-        a = np.ascontiguousarray(a)
-        void_dt = np.dtype((np.void, a.dtype.itemsize * a.shape[1]))
-        _,ids, count = np.unique(a.view(void_dt).ravel(), \
-                                    return_index=1,return_counts=1)
-        largest_count_id = ids[count.argmax()]
-        most_frequent_row = a[largest_count_id]
-        return most_frequent_row[None]
+def mode_rows(labels):
+        rows = np.empty((0, labels.shape[2]))
+        for matrix in labels:
+            matrix = np.ascontiguousarray(matrix)
+            void_dt = np.dtype((np.void, matrix.dtype.itemsize * matrix.shape[1]))
+            _,ids, count = np.unique(matrix.view(void_dt).ravel(), \
+                                        return_index=1,return_counts=1)
+            largest_count_id = ids[count.argmax()]
+            most_frequent_row = matrix[largest_count_id]
+            rows = np.r_[rows, most_frequent_row[None]]
+
+        return rows
 
 
 def knn(k, data, labels, signal_m=None):
 
     if signal_m is None:
         signal = data
-        d_func = lambda dist: dist.argsort()[1:k+1]
+        d_func = lambda dist: dist.argsort()[:,1:k+1]
     else:
         signal = signal_m
-        d_func = lambda dist: dist.argsort()[:k]
+        d_func = lambda dist: dist.argsort()[:,:k]
 
     signal_b = np.empty((0, labels.shape[1]))
 
-    for d in signal:
-        dist = np.linalg.norm(d - data, axis=1)
-        idx = d_func(dist)
-        signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
+    dist = distance.cdist(signal, data, metric='euclidean')
+    idx = d_func(dist)
+    signal_b = mode_rows(labels[idx,:])
+
+    # for d in signal:
+    #     dist = np.linalg.norm(d - data, axis=1)
+    #     idx = d_func(dist)
+    #     signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
 
     return signal_b
+
+
+def test_knn(k, data):
+
+    d_func = lambda dist: dist.argsort()[1:k+1]
+    start_t = time.time()
+    dist = distance.cdist(data, data, metric='euclidean')
+    print("first time:",time.time()-start_t)
+    start_t = time.time()
+    for d in data:
+        dist2 = np.linalg.norm(d - data, axis=1)
+    print("second time:",time.time()-start_t)
+
+
 
 
 def avg_hamming(k, centroids, labels):
