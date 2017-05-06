@@ -57,9 +57,9 @@ title = args.title
 ##################################################
 # load data from csv files
 
-with open(csvfile,'r') as csvfile:
+with open(csvfile,'rb') as csvfile:
     reader = csv.reader(csvfile, delimiter=',')
-    labels = next(reader)
+    labels = reader.next()
     cols = len(labels)
     data = [[] for j in range(cols)] 
 
@@ -97,7 +97,7 @@ plt.title(title, fontsize=BIGGER_SIZE)
 ax = fig.add_subplot(111)
 plt.show(block=False)
 
-ax.set_xlim([0, 1001])
+ax.set_xlim([0, 16])
 h, l = [], [] # legend handels
 
 
@@ -119,9 +119,9 @@ else:
     colors.pop()
 
 if (not args.num): # plot BER
-    ax.set(ylabel='Bit-Error Rate (BER)', xlabel='Training Iterations')
-    ax.set_ylim([0,2048])
-    # ax.set_yscale('log')
+    ax.set(ylabel='Bit-Error Rate (BER)', xlabel='$E_b/N_0$ [dB]')
+    ax.set_ylim([1e-7, 1])
+    ax.set_yscale('log')
 else: # plot number of clusters 
     ax.set(ylabel='Number of clusters', xlabel='$E_b/N_0$ [dB]')
     ax.set_ylim([0, 25])
