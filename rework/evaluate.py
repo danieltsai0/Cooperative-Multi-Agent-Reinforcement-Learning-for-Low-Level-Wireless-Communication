@@ -40,6 +40,10 @@ def single_compute(centroid, fn, ebn0_values, preamble, message, init_string):
 
     with open(fn, "w") as f:
         f.write(init_string + ",".join(ber_vals) + "\n")
+
+
+def run(params):
+    single_compute(**params)
     
 
 if __name__ == "__main__":
@@ -88,10 +92,9 @@ if __name__ == "__main__":
                    ebn0_values=ebn0_values, 
                    preamble=preamble, 
                    message=message, 
-                   init_string=init_string
-                   **general_params)
+                   init_string=init_string)
         args.append(run)
 
     
     p = multiprocessing.Pool()
-    p.map(single_compute, args)
+    p.map(run, args)
