@@ -1,11 +1,10 @@
 import argparse
 import pickle
-import pprint
 import numpy as np 
 import multiprocessing
 import matplotlib.pyplot as plt
 
-import util
+from util import *
 from receiver import KnnReceiver
 from channel import Channel
 from ctypes import *
@@ -30,7 +29,7 @@ def single_compute(centroid):
         mod_preamble_n = channel.AWGN(mod_preamble)
         mod_message_n = channel.AWGN(mod_message)
         # Demodulate signal
-        demod_message = util.centroid_mapping(mod_preamble_n, preamble, mod_message_n)
+        demod_message = centroid_mapping(mod_preamble_n, preamble, mod_message_n)
         # Compute BER
         ber = np.sum(np.linalg.norm(demod_message - message, ord=1, axis=1)) / (TEST_LEN*n_bits)
         # Add to list
@@ -53,7 +52,6 @@ if __name__ == "__main__":
     np.random.seed(0)
     n_bits = 4
     k = 3
-    pp = pprint.PrettyPrinter(indent=4)
 
     cfile = ['output/centroid.pickle','output/centroid1.pickle','output/centroid2.pickle','output/centroid3.pickle',
              'output/centroid4.pickle','output/centroid5.pickle','output/centroid6.pickle','output/centroid7.pickle',
@@ -72,11 +70,10 @@ if __name__ == "__main__":
     # Eb/N0
     ebn0_values = np.linspace(*EBN0_RANGE)
     # Other vars
-    baseline_scheme = util.schemes[n_bits]
+    baseline_scheme = schemes[n_bits]
     # Mapping
-    centroids = [util.schemes[n_bits]] + [pickle.load(open(cfile[i], "rb")) for i in range(len(cfile))]
+    centroids = [baseline_scheme] + [pickle.load(open(cfile[i], "rb")) for i in range(len(cfile))]
 
-    
     init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
     output_string = multiprocessing.Value("c_char", init_string.encode('utf-8'))
     # output_string.value = bytearray("test",'utf-8')
