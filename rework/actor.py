@@ -41,3 +41,6 @@ class Actor():
 
     def save_ber(self, signal_b_g_g):
         self.transmitter.save_ber(signal_b_g_g)
+
+    def save_energy(self, signal):
+        self.transmitter.save_energy(signal)
