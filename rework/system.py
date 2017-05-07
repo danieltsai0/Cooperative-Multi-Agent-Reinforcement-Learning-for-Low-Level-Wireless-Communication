@@ -13,6 +13,7 @@
 #
 ################################################################################
 
+import argparse
 import tensorflow as tf
 import numpy as np
 import actor
@@ -29,6 +30,7 @@ import shutil
 class System():
 
     def __init__(self,
+                 directory,
                  run_id,
                  plot_every, 
                  restrict_energy,
@@ -54,8 +56,8 @@ class System():
         r_args = [self.preamble, k]
 
         # Receiver Parameters
-        self.agent_one = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_1/')
-        self.agent_two = actor.Actor(t_args, r_args, stepsize, output_dir+str(run_id)+'/agent_2/')
+        self.agent_one = actor.Actor(t_args, r_args, stepsize, directory+'agent_1/')
+        self.agent_two = actor.Actor(t_args, r_args, stepsize, directory+'agent_2/')
 
         # Parameters to write in the plotted diagrams
         p_args_names = 'run_id total_iters len_preamble stepsize lambda_p initial_logstd noise_power restrict_energy'.split()
@@ -135,7 +137,7 @@ def single_run(params, verbose=False):
 
     directory = output_dir+"N_"+str(params['noise_power'])+ \
                     "_P_"+str(np.log2(params['len_preamble']))+'/'+ \
-                    str(params['run_id'])+'/'
+                    str(seed)+'/'
     util.create_dir(directory)
     with open(directory+'params.log', 'w') as output_file:
         output_file.write(str(params['run_id']))
@@ -149,7 +151,7 @@ def single_run(params, verbose=False):
         print (params)
         print ('\n')
 
-    sys = System(**params)
+    sys = System(directory, **params)
     reward_constraint = sys.run_sim(verbose)
 
     # if reward constraints not met -> discard
@@ -228,9 +230,18 @@ def noise_and_preamble_sweep(general_params, noise, preamble_len):
 
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("seed", type=str, nargs='*',
+             help="seed for randomness")
+    args, leftovers = parser.parse_known_args()
+
+
     iterations = multiprocessing.Value('i', 0)
-    np.random.seed(4)
-    tf.set_random_seed(5)
+    seed = args.seed
+    print("running with seed: %d" % seed)
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
     output_dir = "output/"
     discard_dir = output_dir+"shitty/" # runs that don't meet the loss threshold
     preview_dir = output_dir+"preview/" # folder for all final constellations
@@ -281,7 +292,7 @@ if __name__ == '__main__':
 
     #############
     # SWITCH
-    run_sweep = False 
+    run_sweep = True 
 
     ##############   
     # SINGLE RUN
