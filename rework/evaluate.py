@@ -75,12 +75,12 @@ def single_compute(centroid):
     
 
 if __name__ == "__main__":
-
-    output_string = multiprocessing.Value("c_char")
+    init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
+    output_string = multiprocessing.Value("c_char", init_string.encode('utf-8'))
     # output_string.value = bytearray("test",'utf-8')
 
     print("starting ...")
-    init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
+    
     p = multiprocessing.Pool()
     p.map(single_compute, centroids)
 
