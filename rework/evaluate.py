@@ -49,6 +49,7 @@ if __name__ == "__main__":
     TEST_LEN = int(1e7) # length of test set
     EBN0_RANGE = (0, 16, 40) # min[dB], max[dB], #steps
     FILENAME = "output/BER_eval.csv"
+    base_fn = "output/%d.csv"
     np.random.seed(0)
     n_bits = 4
     k = 3
@@ -78,19 +79,19 @@ if __name__ == "__main__":
 
     print("starting ...")
 
-    base_fn = "output/%d.csv"
-    jobs = []
+    
+    # Build args
+    args = []
     for i in range(len(centroids)):
-        p = multiprocessing.Process(target=worker, args=(centroids[i], base_fn%i, 
-                                                         ebn0_values, preamble, message,
-                                                         init_string))
-        jobs.append(p)
-        p.start()
+        run = dict(centroid=centroids[i], 
+                   fn=base_fn%i, 
+                   ebn0_values=ebn0_values, 
+                   preamble=preamble, 
+                   message=message, 
+                   init_string=init_string
+                   **general_params)
+        args.append(run)
+
     
     p = multiprocessing.Pool()
-    p.map(single_compute, centroids)
-
-    print(output_string.value)
-
-    # with open(FILENAME, "w") as f:
-    #     f.write(output_string)
+    p.map(single_compute, args)
