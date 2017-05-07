@@ -197,14 +197,14 @@ def noise_and_preamble_sweep(general_params, noise, preamble_len):
    
     params = [] 
     for n in noise:
-        run = dict(run_id         = gen_id(),
+        run = dict(run_id = gen_id(),
                    n_hidden = [40],
-                  stepsize = 2.45e-3,
-                  lambda_p = 9e-2,
+                  stepsize = 2.5e-3,
+                  lambda_p = 5e-2,
                   initial_logstd = -1.0,
                   k = 3,
-                  num_iterations = 1000,
-                  len_preamble = 2**9,
+                  num_iterations = 2000,
+                  len_preamble = 2**7,
                   n_bits = 4,
                   noise_power = n,
                   **general_params)
@@ -212,16 +212,16 @@ def noise_and_preamble_sweep(general_params, noise, preamble_len):
         params.append(run)
 
     for p in preamble_len:
-        run = dict(run_id         = gen_id(),
+        run = dict(run_id = gen_id(),
                    n_hidden = [40],
-                  stepsize = 2.45e-3,
-                  lambda_p = 9e-2,
+                  stepsize = 2.5e-3,
+                  lambda_p = 5e-2,
                   initial_logstd = -1.0,
                   k = 3,
-                  num_iterations = 1000,
+                  num_iterations = 2000,
                   len_preamble = p,
                   n_bits = 4,
-                  noise_power = 0.04,
+                  noise_power = 0.1,
                   **general_params)
 
         params.append(run)
@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("seed", type=str, nargs='*',
+    parser.add_argument("seed", type=int, nargs='*',
              help="seed for randomness")
     args, leftovers = parser.parse_known_args()
 
@@ -251,8 +251,8 @@ if __name__ == '__main__':
 
     # read plot_every from commandline
     plot_every = 1000 
-    if len(sys.argv) == 2:
-        plot_every = int(sys.argv[1])
+    # if len(sys.argv) == 2:
+    #     plot_every = int(sys.argv[1])
 
     # General params
     general_params = dict(plot_every = plot_every,
