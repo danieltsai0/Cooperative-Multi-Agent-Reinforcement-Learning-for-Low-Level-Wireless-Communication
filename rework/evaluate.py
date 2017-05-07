@@ -56,14 +56,15 @@ if __name__ == "__main__":
     PREAMBLE_LEN = 2**int(float(temp[3]))
     TEST_LEN = 1e7 
     FILENAME = "BER_eval.csv"
-    # Generate preamble and EbN0 range
-    PREAMBLE = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
-    MESSAGE = np.random.randint(0,2,[int(TEST_LEN),n_bits])
-    EBN0_RANGE = (0, 16, 40) # min[dB], max[dB], #steps
     # Misc settings
     np.random.seed(0)
     n_bits = 4
     k = 3
+    # Generate preamble and EbN0 range
+    PREAMBLE = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
+    MESSAGE = np.random.randint(0,2,[int(TEST_LEN),n_bits])
+    EBN0_RANGE = (0, 16, 40) # min[dB], max[dB], #steps
+    
 
     centroid_dir = [dirname]
     centroid_file = []
