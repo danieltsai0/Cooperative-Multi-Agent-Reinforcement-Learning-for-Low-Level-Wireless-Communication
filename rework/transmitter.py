@@ -26,7 +26,7 @@ class NeuralTransmitter():
         self.dirname = dirname
         self.im_dir = dirname + '%04d.png'
         self.ber_fn = dirname + 'ber.txt'
-        self.energy_fn - dirname + 'energy.txt'
+        self.energy_fn = dirname + 'energy.txt'
 
         # Placeholders for training
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
@@ -203,7 +203,7 @@ class NeuralTransmitter():
         with open(self.ber_fn, 'a') as f:
             f.write(str(ber) + "\n")
 
-    def save_ber(self):
+    def save_energy(self, signal):
         energy = np.average(np.sum(np.square(signal),axis=1))
         with open(self.energy_fn, 'a') as f:
             f.write(str(energy) + "\n")
