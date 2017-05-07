@@ -43,7 +43,6 @@ class System():
                  initial_logstd,
                  k,
                  noise_power):
-
         # System Parameters
         self.num_iterations = num_iterations
         self.preamble = util.generate_preamble(len_preamble, n_bits)
@@ -98,7 +97,7 @@ class System():
         adv = self.agent_one.transmitter_update(signal_b_g_g_1, i)
         # Visualize transmitter
         if ((i+1) % plot_every == 0):
-            self.agent_one.visualize(i, self.p_args)
+            self.agent_one.visualize(i+1, self.p_args)
         return adv
 
     """
@@ -232,10 +231,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("seed", type=str, nargs='*',
+    parser.add_argument("seed", type=int,
              help="seed for randomness")
     args, leftovers = parser.parse_known_args()
-
 
     iterations = multiprocessing.Value('i', 0)
     seed = args.seed
@@ -251,8 +249,8 @@ if __name__ == '__main__':
 
     # read plot_every from commandline
     plot_every = 1000 
-    if len(sys.argv) == 2:
-        plot_every = int(sys.argv[1])
+    # if len(sys.argv) == 2:
+    #    plot_every = int(sys.argv[1])
 
     # General params
     general_params = dict(plot_every = plot_every,
@@ -286,7 +284,7 @@ if __name__ == '__main__':
                   **general_params)
     
 
-    noise = [0.01, 0.04, 0.16]
+    noise = [0.01, 0.16]
     preamble_len = [2**7, 2**8, 2**9]
     params_sweep = noise_and_preamble_sweep (general_params, noise, preamble_len)
 

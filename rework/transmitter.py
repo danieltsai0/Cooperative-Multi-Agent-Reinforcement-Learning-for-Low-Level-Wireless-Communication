@@ -199,7 +199,7 @@ class NeuralTransmitter():
 
 
     def save_ber(self, signal_b_g_g):
-        ber = np.sum(np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1)/2)
+        ber = np.sum(np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1)/2) / (signal_b_g_g.shape[0] * signal_b_g_g.shape[1])
         with open(self.ber_fn, 'a') as f:
             f.write(str(ber) + "\n")
 
