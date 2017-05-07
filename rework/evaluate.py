@@ -71,24 +71,20 @@ def single_compute(centroid):
     print("    done")
 
     with output_string.get_lock():
-        output_string.value += 1
-        print(output_string.value)
+        output_string.value += (",".join(ber_vals) + "\n").encode('utf-8')
     
 
 if __name__ == "__main__":
 
-    output_string = multiprocessing.Value("i", 0)
+    output_string = multiprocessing.Value("c_char")
     # output_string.value = bytearray("test",'utf-8')
 
     print("starting ...")
     init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
     p = multiprocessing.Pool()
-    workers = p.map(single_compute, centroids)
-    
-    for worker in workers:
-        worker.wait()
+    p.map(single_compute, centroids)
 
-    print(output_string)
+    print(output_string.value)
 
     # with open(FILENAME, "w") as f:
     #     f.write(output_string)
