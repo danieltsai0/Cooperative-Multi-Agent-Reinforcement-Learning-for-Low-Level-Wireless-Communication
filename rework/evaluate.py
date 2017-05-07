@@ -2,16 +2,18 @@ import argparse
 import pickle
 import pprint
 import numpy as np 
+import multiprocessing
 import matplotlib.pyplot as plt
 
 import util
 from receiver import KnnReceiver
 from channel import Channel
+from ctypes import c_char
 
 
 #### Variables ####
 PREAMBLE_LEN = 512 # length of preamble
-TEST_LEN = int(1e7) # length of test set
+TEST_LEN = 100 # length of test set
 EBN0_RANGE = (0, 16, 40) # min[dB], max[dB], #steps
 FILENAME = "output/BER_eval.csv"
 np.random.seed(0)
@@ -30,23 +32,18 @@ cfile = ['output/centroid.pickle','output/centroid1.pickle','output/centroid2.pi
 #          help="path to centroids file")
 # args, leftovers = parser.parse_known_args()
 
-# Mapping
-# centroids = [util.schemes[n_bits]] + [pickle.load(open(args.cfile[i], "rb")) for i in range(len(args.cfile))]
-centroids = [util.schemes[n_bits]] + [pickle.load(open(cfile[i], "rb")) for i in range(len(cfile))]
 # Create preamble
 preamble = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
 message = np.random.randint(0,2,[TEST_LEN,n_bits])
 # Eb/N0
 ebn0_values = np.linspace(*EBN0_RANGE)
-# Define receiver
-# receiver = KnnReceiver(preamble, k)
 # Other vars
 baseline_scheme = util.schemes[n_bits]
-output_string = ",".join([str(x) for x in ebn0_values]) + "\n"
+# Mapping
+centroids = [util.schemes[n_bits]] + [pickle.load(open(cfile[i], "rb")) for i in range(len(cfile))]
 
 # Run computations
-for i,centroid in enumerate(centroids):
-    print("processing file number:",i)
+def single_compute(centroid):
     map_func = lambda x: centroid[tuple(x)]
     mean_Es = np.average([np.sum(np.square(x)) for x in list(centroid.values())])
     ber_vals = []
@@ -69,10 +66,29 @@ for i,centroid in enumerate(centroids):
         ber = np.sum(np.linalg.norm(demod_message - message, ord=1, axis=1)) / (TEST_LEN*n_bits)
         # Add to list
         ber_vals.append(str(ber))
-        print("    EbN0: %8f, ber: %8f" % (EbN0, ber))
-        
-    output_string += ",".join(ber_vals) + "\n"
+        # print("    EbN0: %8f, ber: %8f" % (EbN0, ber))
+
+    print("    done")
+
+    with output_string.get_lock():
+        output_string.value += 1
+        print(output_string.value)
     
 
-with open(FILENAME, "w") as f:
-    f.write(output_string)
+if __name__ == "__main__":
+
+    output_string = multiprocessing.Value("i", 0)
+    # output_string.value = bytearray("test",'utf-8')
+
+    print("starting ...")
+    init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
+    p = multiprocessing.Pool()
+    workers = p.map(single_compute, centroids)
+    
+    for worker in workers:
+        worker.wait()
+
+    print(output_string)
+
+    # with open(FILENAME, "w") as f:
+    #     f.write(output_string)
