@@ -11,7 +11,8 @@ from ctypes import c_char
 
 
 # Run computations
-def single_compute(centroid, fn, ebn0_values, preamble, message, init_string):
+def single_compute(args):
+    centroid, fn, ebn0_values, preamble, message, init_string = args
     map_func = lambda x: centroid[tuple(x)]
     mean_Es = np.average([np.sum(np.square(x)) for x in list(centroid.values())])
     ber_vals = []
@@ -43,7 +44,8 @@ def single_compute(centroid, fn, ebn0_values, preamble, message, init_string):
 
 
 def run(param):
-    single_compute(**param)
+    print(param)
+    single_compute(param)
     
 
 if __name__ == "__main__":
@@ -87,12 +89,13 @@ if __name__ == "__main__":
     # Build args
     params = []
     for i in range(len(centroids)):
-        run = dict(centroid=centroids[i], 
-                   fn=base_fn%i, 
-                   ebn0_values=ebn0_values, 
-                   preamble=preamble, 
-                   message=message, 
-                   init_string=init_string)
+        run = (centroids[i], 
+               base_fn%i, 
+               ebn0_values, 
+               preamble, 
+               message, 
+               init_string)
+
         params.append(run)
 
     
