@@ -26,6 +26,7 @@ class NeuralTransmitter():
         self.dirname = dirname
         self.im_dir = dirname + '%04d.png'
         self.ber_fn = dirname + 'ber.txt'
+        self.energy_fn - dirname + 'energy.txt'
 
         # Placeholders for training
         self.input = tf.placeholder(tf.float32, [None, self.n_bits]) # -1 or 1
@@ -201,6 +202,11 @@ class NeuralTransmitter():
         ber = np.sum(np.linalg.norm(self.input_accum - signal_b_g_g, ord=1, axis=1)/2)
         with open(self.ber_fn, 'a') as f:
             f.write(str(ber) + "\n")
+
+    def save_ber(self):
+        energy = np.average(np.sum(np.square(signal),axis=1))
+        with open(self.energy_fn, 'a') as f:
+            f.write(str(energy) + "\n")
 
 
     def lasso_loss(self, signal_b_g_g):

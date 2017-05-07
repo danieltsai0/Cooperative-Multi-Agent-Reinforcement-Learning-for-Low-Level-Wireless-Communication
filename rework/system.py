@@ -76,6 +76,7 @@ class System():
         signal_b = self.preamble
         # Transmit bit signal, produce modulated signal
         signal_m_1 = self.agent_one.transmit(signal_b)
+        self.agent_one.save_energy(signal_m_1)
         # Apply channel noise, produce noisy modulated signal
         signal_m_1 = self.channel.AWGN(signal_m_1) 
         # Receive mod signal, produce bit signal guess
@@ -89,11 +90,12 @@ class System():
         # Receive mod signal guess, produce bit signal guess of guess
         signal_b_g_g_1 = self.agent_one.receive(signal_m_2, signal_m_g_2)
         # Save BER of transmitter one
+
         self.agent_one.save_ber(signal_b_g_g_1)
         # Update transmitter with bit signal guess of guess
         adv = self.agent_one.transmitter_update(signal_b_g_g_1, i)
         # Visualize transmitter
-        if (i % plot_every == 0):
+        if ((i+1) % plot_every == 0):
             self.agent_one.visualize(i, self.p_args)
         return adv
 
@@ -131,7 +133,9 @@ class System():
 """ execute a single run with a set of hyperparameters """
 def single_run(params, verbose=False):
 
-    directory = output_dir+str(params['run_id'])+'/'
+    directory = output_dir+"N_"+str(params['noise_power'])+
+                    "_P_"+str(np.log2(params['len_preamble']))+'/'+
+                    str(params['run_id'])+'/'
     util.create_dir(directory)
     with open(directory+'params.log', 'w') as output_file:
         output_file.write(str(params['run_id']))
@@ -186,6 +190,42 @@ def hyperparam_sweep(general_params, total):
 
     return params
 
+
+def noise_and_preamble_sweep(general_params, noise, preamble_len):
+   
+    params = [] 
+    for n in noise:
+        run = dict(run_id         = gen_id(),
+                   n_hidden = [40],
+                  stepsize = 2.45e-3,
+                  lambda_p = 9e-2,
+                  initial_logstd = -1.0,
+                  k = 3,
+                  num_iterations = 1000,
+                  len_preamble = 2**9,
+                  n_bits = 4,
+                  noise_power = n,
+                  **general_params)
+
+        params.append(run)
+
+    for p in preamble_len:
+        run = dict(run_id         = gen_id(),
+                   n_hidden = [40],
+                  stepsize = 2.45e-3,
+                  lambda_p = 9e-2,
+                  initial_logstd = -1.0,
+                  k = 3,
+                  num_iterations = 1000,
+                  len_preamble = p,
+                  n_bits = 4,
+                  noise_power = 0.04,
+                  **general_params)
+
+        params.append(run)
+
+    return params
+
 if __name__ == '__main__':
 
     iterations = multiprocessing.Value('i', 0)
@@ -199,7 +239,7 @@ if __name__ == '__main__':
     util.create_dir(preview_dir)
 
     # read plot_every from commandline
-    plot_every = 25 
+    plot_every = 1000 
     if len(sys.argv) == 2:
         plot_every = int(sys.argv[1])
 
@@ -234,7 +274,10 @@ if __name__ == '__main__':
                   noise_power = 0.04,
                   **general_params)
     
-    params_sweep = hyperparam_sweep(general_params, 1000)
+
+    noise = [0.01, 0.04, 0.16]
+    preamble_len = [2**7, 2**8, 2**9]
+    params_sweep = noise_and_preamble_sweep (general_params, noise, premable_len)
 
     #############
     # SWITCH
