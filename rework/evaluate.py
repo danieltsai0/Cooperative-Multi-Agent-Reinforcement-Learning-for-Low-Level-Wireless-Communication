@@ -11,6 +11,7 @@ from ctypes import c_char
 
 PREAMBLE_LEN = 512 # length of preamble
 TEST_LEN = 1e8 # length of test set
+n_bits = 4
     
 PREAMBLE = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
 MESSAGE = np.random.randint(0,2,[int(TEST_LEN),n_bits])

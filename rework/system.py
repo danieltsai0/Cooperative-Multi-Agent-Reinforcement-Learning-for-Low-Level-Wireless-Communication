@@ -286,7 +286,7 @@ if __name__ == '__main__':
                   **general_params)
     
 
-    noise = [0.01, 0.16]
+    noise = [0.01, 0.04, 0.16]
     preamble_len = [2**7, 2**8, 2**9]
     params_sweep = noise_and_preamble_sweep (general_params, noise, preamble_len)
 
