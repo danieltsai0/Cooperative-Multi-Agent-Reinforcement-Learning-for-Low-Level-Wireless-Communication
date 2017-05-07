@@ -46,7 +46,7 @@ def wrapper_func(param):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("dirname", type=str, nargs='*',
+    parser.add_argument("dirname", type=str,
              help="dirname containing centroids")
     args, leftovers = parser.parse_known_args()
 
