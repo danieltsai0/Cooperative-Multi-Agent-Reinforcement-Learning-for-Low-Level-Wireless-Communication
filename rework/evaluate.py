@@ -42,8 +42,8 @@ def single_compute(centroid, fn, ebn0_values, preamble, message, init_string):
         f.write(init_string + ",".join(ber_vals) + "\n")
 
 
-def run(params):
-    single_compute(**params)
+def run(param):
+    single_compute(**param)
     
 
 if __name__ == "__main__":
@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     
     # Build args
-    args = []
+    params = []
     for i in range(len(centroids)):
         run = dict(centroid=centroids[i], 
                    fn=base_fn%i, 
@@ -93,8 +93,8 @@ if __name__ == "__main__":
                    preamble=preamble, 
                    message=message, 
                    init_string=init_string)
-        args.append(run)
+        params.append(run)
 
     
     p = multiprocessing.Pool()
-    p.map(run, args)
+    p.map(run, params)
