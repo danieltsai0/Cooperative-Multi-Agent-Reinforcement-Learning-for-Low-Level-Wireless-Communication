@@ -240,10 +240,43 @@ def knn(k, data, labels, signal_m=None):
     idx = d_func(dist)
     signal_b = mode_rows(labels[idx,:])
 
+    # for 
+    #     dist = distance.cdist(signal, data, metric='euclidean')
+    #     idx = d_func(dist)
+    #     signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
     # for d in signal:
     #     dist = np.linalg.norm(d - data, axis=1)
     #     idx = d_func(dist)
     #     signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
+
+    return signal_b
+
+
+def centroid_mapping(data, labels, signal_m=None):
+    labels = [tuple(x) for x in labels]
+    if signal_m is None:
+        signal = data
+    else:
+        signal = signal_m
+
+    # Calculate centroids
+    c_dict = dict()    
+    for i,label in enumerate(labels):
+        try:
+            c_dict[label] = (c_dict[label][0] + data[i], c_dict[label][1]+1)
+        except KeyError:
+            c_dict[label] = (data[i], 1)
+
+    # Convert centroids into np matrices
+    centroids = np.empty((0, data.shape[1]))
+    centroid_labels = np.empty((0, len(labels[0])))
+    for k,v in c_dict.items():
+        centroid_labels = np.r_[centroid_labels, np.array(k)[None]]
+        centroids = np.r_[centroids, np.array(v[0]/v[1])[None]]
+    # Compute labels
+    dist = distance.cdist(signal, centroids, metric='euclidean')
+    idx = dist.argmin(axis=1)
+    signal_b = centroid_labels[idx,:]
 
     return signal_b
 
