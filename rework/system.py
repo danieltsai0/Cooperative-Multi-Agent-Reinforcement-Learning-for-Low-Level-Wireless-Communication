@@ -133,8 +133,8 @@ class System():
 """ execute a single run with a set of hyperparameters """
 def single_run(params, verbose=False):
 
-    directory = output_dir+"N_"+str(params['noise_power'])+
-                    "_P_"+str(np.log2(params['len_preamble']))+'/'+
+    directory = output_dir+"N_"+str(params['noise_power'])+ \
+                    "_P_"+str(np.log2(params['len_preamble']))+'/'+ \
                     str(params['run_id'])+'/'
     util.create_dir(directory)
     with open(directory+'params.log', 'w') as output_file:
