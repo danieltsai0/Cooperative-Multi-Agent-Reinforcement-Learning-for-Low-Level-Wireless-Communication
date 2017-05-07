@@ -7,16 +7,10 @@ import matplotlib.pyplot as plt
 import util
 from receiver import KnnReceiver
 from channel import Channel
-from ctypes import c_char
 
-PREAMBLE_LEN = 512 # length of preamble
-TEST_LEN = 1e8 # length of test set
-    
-PREAMBLE = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
-MESSAGE = np.random.randint(0,2,[int(TEST_LEN),n_bits])
 
 # Run computations
-def single_compute(centroid, fn, ebn0_values, init_string):
+def single_compute(centroid, fn):
     map_func = lambda x: centroid[tuple(x)]
     mean_Es = np.average([np.sum(np.square(x)) for x in list(centroid.values())])
     ber_vals = []
@@ -53,33 +47,41 @@ def wrapper_func(param):
 
 if __name__ == "__main__":
 
-    #### Variables ####
-    EBN0_RANGE = (0, 16, 60) # min[dB], max[dB], #steps
-    FILENAME = "output/BER_eval.csv"
-    base_fn = "output/%d.csv"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dirname", type=str, nargs='*',
+             help="dirname containing centroids")
+    args, leftovers = parser.parse_known_args()
+
+    # Process args
+    dirname = args.dirname + "/"
+    temp = args.dirname.split("_")
+    PREAMBLE_LEN = 2**int(float(temp[3]))
+    TEST_LEN = 1e7 
+    FILENAME = "BER_eval.csv"
+    # Generate preamble and EbN0 range
+    PREAMBLE = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
+    MESSAGE = np.random.randint(0,2,[int(TEST_LEN),n_bits])
+    EBN0_RANGE = (0, 16, 40) # min[dB], max[dB], #steps
+    # Misc settings
     np.random.seed(0)
     n_bits = 4
     k = 3
 
-    cfile = ['output/centroid.pickle','output/centroid1.pickle','output/centroid2.pickle','output/centroid3.pickle',
-             'output/centroid4.pickle','output/centroid5.pickle','output/centroid6.pickle','output/centroid7.pickle',
-             'output/centroid8.pickle','output/centroid9.pickle']
+    centroid_dir = [dirname]
+    centroid_file = []
+    for i in range(5):
+        centroid_dir.append(dirname + str(i) + "/" + "agent_1/" + FILENAME)
+        centroid_dir.append(dirname + str(i) + "/" + "agent_2/" + FILENAME)
+        centroid_file.append(dirname + str(i) + "/" + "agent_1/centroid.pickle")
+        centroid_file.append(dirname + str(i) + "/" + "agent_2/centroid.pickle")
 
-    # #### Load centroids and generate preamble
-    # parser = argparse.ArgumentParser()
-
-    # parser.add_argument("cfile", type=str, nargs='*',
-    #          help="path to centroids file")
-    # args, leftovers = parser.parse_known_args()
-
-    # Create preamble
-    
     # Eb/N0
     ebn0_values = np.linspace(*EBN0_RANGE)
     # Other vars
+    
     baseline_scheme = util.schemes[n_bits]
     # Mapping
-    centroids = [util.schemes[n_bits]] + [pickle.load(open(cfile[i], "rb")) for i in range(len(cfile))]
+    centroids = [util.schemes[n_bits]] + [pickle.load(open(centroid_file[i], "rb")) for i in range(len(centroid_file))]
 
     init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
 
@@ -90,9 +92,7 @@ if __name__ == "__main__":
     params = []
     for i in range(len(centroids)):
         run = dict(centroid=centroids[i], 
-                   fn=base_fn%i, 
-                   ebn0_values=ebn0_values, 
-                   init_string=init_string)
+                   fn=centroid_dir[i])
         params.append(run)
 
     
