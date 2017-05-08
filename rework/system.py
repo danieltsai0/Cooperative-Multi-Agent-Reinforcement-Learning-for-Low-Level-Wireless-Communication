@@ -197,10 +197,10 @@ def noise_and_preamble_sweep(general_params, noise, preamble_len):
     params = [] 
     for n in noise:
         run = dict(run_id = gen_id(),
-                   n_hidden = [40],
-                  stepsize = 2.5e-3,
+                  n_hidden = [40],
+                  stepsize = 2e-3,
                   lambda_p = 5e-2,
-                  initial_logstd = -1.0,
+                  initial_logstd = -2.0,
                   k = 3,
                   num_iterations = 2000,
                   len_preamble = 2**9,
@@ -210,20 +210,20 @@ def noise_and_preamble_sweep(general_params, noise, preamble_len):
 
         params.append(run)
 
-    for p in preamble_len:
-        run = dict(run_id = gen_id(),
-                   n_hidden = [40],
-                  stepsize = 2.5e-3,
-                  lambda_p = 5e-2,
-                  initial_logstd = -1.0,
-                  k = 3,
-                  num_iterations = 2000,
-                  len_preamble = p,
-                  n_bits = 4,
-                  noise_power = 0.1,
-                  **general_params)
+    # for p in preamble_len:
+    #     run = dict(run_id = gen_id(),
+    #                n_hidden = [40],
+    #               stepsize = 2.5e-3,
+    #               lambda_p = 5e-2,
+    #               initial_logstd = -1.0,
+    #               k = 3,
+    #               num_iterations = 2000,
+    #               len_preamble = p,
+    #               n_bits = 4,
+    #               noise_power = 0.1,
+    #               **general_params)
 
-        params.append(run)
+    #     params.append(run)
 
     return params
 
@@ -256,7 +256,7 @@ if __name__ == '__main__':
 
     # General params
     general_params = dict(plot_every = plot_every,
-                          restrict_energy = False 
+                          restrict_energy = True 
                      ) 
 
     # # Hyperparameters for restricted
@@ -286,7 +286,7 @@ if __name__ == '__main__':
                   **general_params)
     
 
-    noise = [0.01, 0.04, 0.09]
+    noise = [0.01, 0.04, 0.09, 0.16]
     preamble_len = [2**7, 2**8, 2**9]
     params_sweep = noise_and_preamble_sweep (general_params, noise, preamble_len)
 
