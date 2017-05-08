@@ -67,7 +67,7 @@ if __name__ == "__main__":
     EBN0_RANGE = (0, 16, 40) # min[dB], max[dB], #steps
     
 
-    centroid_dir = [dirname]
+    centroid_dir = [dirname + FILENAME]
     centroid_file = []
     for i in range(5):
         centroid_dir.append(dirname + str(i) + "/" + "agent_1/" + FILENAME)
