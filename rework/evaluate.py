@@ -27,7 +27,7 @@ def single_compute(centroid, fn):
         mod_preamble_n = channel.AWGN(mod_preamble)
         mod_message_n = channel.AWGN(mod_message)
         # Demodulate signal
-        demod_message = util.knn(k, mod_preamble_n, PREAMBLE, mod_message_n)
+        demod_message = util.centroid_mapping(mod_preamble_n, PREAMBLE, mod_message_n)
         # Compute BER
         ber = np.sum(np.linalg.norm(demod_message - MESSAGE, ord=1, axis=1)) / (TEST_LEN*n_bits)
         # Add to list
@@ -54,13 +54,13 @@ if __name__ == "__main__":
     # Process args
     dirname = args.dirname + "/"
     temp = args.dirname.split("_")
-    PREAMBLE_LEN = 2**int(float(temp[3]))
+    PREAMBLE_LEN = 10000
     TEST_LEN = 1e7
     FILENAME = "BER_eval.csv"
     # Misc settings
     np.random.seed(0)
     n_bits = 4
-    k = 20
+
     # Generate preamble and EbN0 range
     PREAMBLE = np.random.randint(0,2,[PREAMBLE_LEN,n_bits])
     MESSAGE = np.random.randint(0,2,[int(TEST_LEN),n_bits])

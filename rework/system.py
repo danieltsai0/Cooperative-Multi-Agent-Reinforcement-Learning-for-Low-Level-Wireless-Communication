@@ -203,7 +203,7 @@ def noise_and_preamble_sweep(general_params, noise, preamble_len):
                   initial_logstd = -1.0,
                   k = 3,
                   num_iterations = 2000,
-                  len_preamble = 2**7,
+                  len_preamble = 2**9,
                   n_bits = 4,
                   noise_power = n,
                   **general_params)
@@ -279,14 +279,14 @@ if __name__ == '__main__':
                   lambda_p = 9e-2,
                   initial_logstd = -1.0,
                   k = 3,
-                  num_iterations = 1000,
+                  num_iterations = 2000,
                   len_preamble = 2**9,
                   n_bits = 4,
                   noise_power = 0.04,
                   **general_params)
     
 
-    noise = [0.01, 0.04, 0.16]
+    noise = [0.01, 0.04, 0.09]
     preamble_len = [2**7, 2**8, 2**9]
     params_sweep = noise_and_preamble_sweep (general_params, noise, preamble_len)
 
@@ -298,7 +298,7 @@ if __name__ == '__main__':
     # SINGLE RUN
     ##############  
     if not run_sweep:
-        single_run(params_single, verbose=True) 
+        single_run(params_single, verbose=False) 
     
     ###################   
     # PARAMETER SWEEP 
