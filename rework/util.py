@@ -236,14 +236,18 @@ def knn(k, data, labels, signal_m=None):
 
     signal_b = np.empty((0, labels.shape[1]))
 
-    dist = distance.cdist(signal, data, metric='euclidean')
-    idx = d_func(dist)
-    signal_b = mode_rows(labels[idx,:])
+    # dist = distance.cdist(signal, data, metric='euclidean')
+    # idx = d_func(dist)
+    # signal_b = mode_rows(labels[idx,:])
 
-    # for 
-    #     dist = distance.cdist(signal, data, metric='euclidean')
-    #     idx = d_func(dist)
-    #     signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
+
+    indices = [int(x) for x in list(np.linspace(0, signal.shape[0], 11)[1:-1])]
+    signal_blocks = np.split(signal, indices)
+
+    for block in signal_blocks:
+        dist = distance.cdist(block, data, metric='euclidean')
+        idx = d_func(dist)
+        signal_b = np.r_[signal_b, mode_rows(labels[idx,:])]
     # for d in signal:
     #     dist = np.linalg.norm(d - data, axis=1)
     #     idx = d_func(dist)
