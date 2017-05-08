@@ -42,30 +42,6 @@ def single_compute(centroid, fn):
 
 def wrapper_func(param):
     single_compute(**param)
-
-
-def evaluate_baseline(mod, message):
-    """ does a BER measurement with standard modulation schemes """
-
-    # create mapping xor diff -> biterrors 
-    error_values = np.array([bin(x).count('1') for x in range(16)]) 
-
-    x_raw, x = message, mod
-    ary = []
-    for m in x_raw:
-        out = 0
-        for bit in m:
-            out = (out << 1) | bit
-        ary.append(out)
-    x_raw = np.array(ary)
-    means = np.array(list(util.schemes[n_bits].values()))
-    x_recon = np.argmin(np.abs(x[:, None] - means.T[None, :]), axis=1)
-    print(x_recon.shape)
-
-    diff = x_recon^x_raw # bitwise comparison
-    bit_errors = np.sum(error_values[diff])
-    ber = bit_errors/(NUM_SAMPLES*BITS_PER_SYMBOL)
-    return ber
     
 
 if __name__ == "__main__":
@@ -104,19 +80,19 @@ if __name__ == "__main__":
     # Other vars
 
     # Mapping
-    # centroids = [util.schemes[n_bits]] + [pickle.load(open(centroid_file[i], "rb")) for i in range(len(centroid_file))]
-    single_compute(util.schemes[n_bits], FILENAME)
-    # init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
+    centroids = [util.schemes[n_bits]] + [pickle.load(open(centroid_file[i], "rb")) for i in range(len(centroid_file))]
 
-    # print("starting ...")
+    init_string = (",".join([str(x) for x in ebn0_values]) + "\n")
 
-    # # Build args
-    # params = []
-    # for i in range(len(centroids)):
-    #     run = dict(centroid=centroids[i], 
-    #                fn=centroid_dir[i])
-    #     params.append(run)
+    print("starting ...")
+
+    # Build args
+    params = []
+    for i in range(len(centroids)):
+        run = dict(centroid=centroids[i], 
+                   fn=centroid_dir[i])
+        params.append(run)
 
     
-    # p = multiprocessing.Pool()
-    # p.map(wrapper_func, params)
+    p = multiprocessing.Pool()
+    p.map(wrapper_func, params)
