@@ -57,9 +57,10 @@ title = args.title
 ##################################################
 # load data from csv files
 
-with open(csvfile,'rb') as csvfile:
+with open(csvfile,'r') as csvfile:
     reader = csv.reader(csvfile, delimiter=',')
-    labels = reader.next()
+    labels = next(reader)
+
     cols = len(labels)
     data = [[] for j in range(cols)] 
 
@@ -74,9 +75,9 @@ with open(csvfile,'rb') as csvfile:
 
 if (double_y): # read data for second y axis
 
-    with open(csvfile2,'rb') as csvfile2:
+    with open(csvfile2,'r') as csvfile2:
         reader2 = csv.reader(csvfile2, delimiter=',')
-        labels2 = reader2.next()
+        labels2 = next(reader2)
         cols2 = len(labels2)
         data2 = [[] for j in range(cols2)] 
 
@@ -97,7 +98,8 @@ plt.title(title, fontsize=BIGGER_SIZE)
 ax = fig.add_subplot(111)
 plt.show(block=False)
 
-ax.set_xlim([0, 16])
+# ax.set_xlim([0, 16]) 
+ax.set_xlim([0, 1000]) 
 h, l = [], [] # legend handels
 
 
@@ -120,14 +122,16 @@ else:
 
 if (not args.num): # plot BER
     ax.set(ylabel='Bit-Error Rate (BER)', xlabel='$E_b/N_0$ [dB]')
-    ax.set_ylim([1e-7, 1])
-    ax.set_yscale('log')
+    ax.set_ylim([0, 1])
+    # ax.set_ylim([1e-7, 1])
+    # ax.set_yscale('log')
 else: # plot number of clusters 
     ax.set(ylabel='Number of clusters', xlabel='$E_b/N_0$ [dB]')
     ax.set_ylim([0, 25])
 
 
 for i in np.arange(1,len(data),2):
+    print(i)
     color = colors.pop()
     ax.plot(data[0], data[i], color=color, label=labels[i], lw=3)
     ax.fill_between(data[0], data[i]-data[i+1]/2.0, data[i]+data[i+1]/2.0,

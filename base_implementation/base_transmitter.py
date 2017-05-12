@@ -1,4 +1,4 @@
-############################################################
+x############################################################
 #
 # WORKING CARTESIAN
 #
@@ -14,6 +14,7 @@ import IPython as ipy
 import itertools
 import matplotlib.pyplot as plt
 import time
+from matplotlib2tikz import save as tikz_save
 
 # normalized constant initializer from cs 294-112 code
 def normc_initializer(std=1.0):
@@ -122,6 +123,7 @@ class NeuralTransmitter(object):
                 x_gt, y_gt = groundtruth[k]
                 plt.scatter(x_gt, y_gt, label=str(bs), s=5, color='purple')
                 plt.annotate(str(k), (x_gt, y_gt), size=5)
+
 
         plt.savefig('figures/Tx/%d.png' % iteration)
         plt.close()
