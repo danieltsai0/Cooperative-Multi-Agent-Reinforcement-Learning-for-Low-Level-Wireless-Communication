@@ -1,3 +1,21 @@
+################################################################################
+#
+#  Transmitter unit class
+#
+#  Evaluates centroids of a transmitter stored in a pickle file. Evaluation 
+#  process involves sending a preamble of length 10 thousand and a random message
+#  of length 10 million and computing the bit error rate of the output of the
+#  Knn receiver compared with the original message. 
+#
+#  This is computed for 40 E_b/N_0 values.
+#
+#   Sample call:
+#       python evaluate.py dir_containing_centroids
+#
+################################################################################
+
+
+
 import argparse
 import pickle
 import numpy as np 

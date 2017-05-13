@@ -232,8 +232,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
 
-    parser.add_argument("seed", type=int,
-             help="seed for randomness")
+    parser.add_argument("seed", type=int, default=0,
+             help="integer seed for stability in randomness")
     args, leftovers = parser.parse_known_args()
 
     iterations = multiprocessing.Value('i', 0)
@@ -249,9 +249,7 @@ if __name__ == '__main__':
     util.create_dir(preview_dir)
 
     # read plot_every from commandline
-    plot_every = 1000 
-    if len(sys.argv) == 2:
-        plot_every = int(sys.argv[1])
+    plot_every = 1 
 
 
 
@@ -259,7 +257,7 @@ if __name__ == '__main__':
     #############
     # SWITCH
     #############
-    run_sweep = True 
+    run_sweep = False 
     restrict_energy = True
 
 

@@ -200,19 +200,6 @@ class NeuralTransmitter():
 
 
     """
-    Evaluation function, used for the visualization method. 
-
-    """
-    # def evaluate(self, signal_b):
-    #     # run policy
-    #     re, im = np.squeeze(self.sess.run([self.re_mean, self.im_mean], feed_dict={
-    #             self.input: signal_b,
-    #             self.batch_size: signal_b.shape[0]
-    #         }))   
-    #     return np.array([np.squeeze(re),np.squeeze(im)]).T
-
-
-    """
     Visualization method. Used for generating scatter plots 
     to give an idea of what the current transmission modulation
     scheme looks like.
